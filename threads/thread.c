@@ -27,6 +27,7 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+static struct list sleep_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -108,6 +109,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleep_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -587,4 +589,44 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+}
+
+void Thread_Sleep(int64_t wakeTime)
+{
+	struct thread* curThread = thread_current();
+	curThread->wakeTime = wakeTime;
+
+	enum intr_level old_level = intr_disable ();
+
+	// 잘자 쓰레드야
+	list_insert_ordered(&sleep_list, &(curThread->elem), sleep_less, NULL);
+	thread_block();
+	
+	intr_set_level (old_level);
+}
+
+void Thread_WakeUp()
+{
+	int64_t curTime = timer_ticks();
+	while (!list_empty(&sleep_list))
+	{	
+		struct list_elem* cur = list_front(&sleep_list);
+		struct thread* curThread = list_entry(cur, struct thread, elem);
+		//msg("[%p] %d < %d", curThread, curThread->wakeTime, curTime);
+		// 아직 일어날 떄 안됐으면 리턴
+		if(curThread->wakeTime > curTime) return;
+		//msg("[%p] Status:%d", curThread, curThread->status);
+
+		list_pop_front(&sleep_list);
+		thread_unblock(curThread);
+	}
+}
+
+static bool sleep_less (const struct list_elem *a_, 
+	const struct list_elem *b_, void *aux UNUSED)
+{
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+  
+  return a->wakeTime < b->wakeTime;
 }

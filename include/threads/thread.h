@@ -92,6 +92,8 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 
+	int64_t wakeTime;
+
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
@@ -144,3 +146,9 @@ int thread_get_load_avg (void);
 void do_iret (struct intr_frame *tf);
 
 #endif /* threads/thread.h */
+
+void Thread_Sleep(int64_t wakeTime);
+void Thread_WakeUp();
+
+
+static bool sleep_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
