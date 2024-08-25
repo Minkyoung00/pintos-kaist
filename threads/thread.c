@@ -242,10 +242,22 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	//list_push_back (&ready_list, &t->elem);
+	list_insert_ordered(&ready_list, &(t->elem), priority_less, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
+
+// 쓰레드 풀에 넣을 때 priority 순서로 넣어보자.
+static bool priority_less (const struct list_elem *a_, 
+	const struct list_elem *b_, void *aux UNUSED)
+{
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+  
+  return a->priority > b->priority;
+}
+
 
 /* Returns the name of the running thread. */
 const char *
@@ -613,10 +625,11 @@ void Thread_WakeUp()
 		struct list_elem* cur = list_front(&sleep_list);
 		struct thread* curThread = list_entry(cur, struct thread, elem);
 		//msg("[%p] %d < %d", curThread, curThread->wakeTime, curTime);
-		// 아직 일어날 떄 안됐으면 리턴
+		// 아직 일어날 때 안됐으면 리턴
 		if(curThread->wakeTime > curTime) return;
 		//msg("[%p] Status:%d", curThread, curThread->status);
 
+		// 일어나 코딩해야지
 		list_pop_front(&sleep_list);
 		thread_unblock(curThread);
 	}

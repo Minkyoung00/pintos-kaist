@@ -1,11 +1,9 @@
 FAIL
-Kernel panic in run: PANIC at ../../lib/kernel/list.c:158 in list_insert(): assertion `is_interior (before) || is_tail (before)' failed.
-Call stack: 0x8004213338 0x8004213881 0x8004213b29 0x80042098c2 0x8004209d23 0x8004219697 0x80042071a0
+Kernel panic in run: PANIC at ../../threads/thread.c:281 in thread_current(): assertion `t->status == THREAD_RUNNING' failed.
+Call stack: 0x80042133b5 0x8004206f2f 0x8004206e6b 0x8004219736 0x800420721d
 Translation of call stack:
-0x0000008004213338: debug_panic (lib/kernel/debug.c:32)
-0x0000008004213881: list_insert (lib/kernel/list.c:159)
-0x0000008004213b29: list_push_back (lib/kernel/list.c:204)
-0x00000080042098c2: sema_down (threads/synch.c:70)
-0x0000008004209d23: lock_acquire (threads/synch.c:192)
-0x0000008004219697: donor_thread_func (tests/threads/priority-donate-chain.c:93)
-0x00000080042071a0: kernel_thread (threads/thread.c:396)
+0x00000080042133b5: debug_panic (lib/kernel/debug.c:32)
+0x0000008004206f2f: thread_current (threads/thread.c:283)
+0x0000008004206e6b: thread_name (threads/thread.c:265)
+0x0000008004219736: donor_thread_func (tests/threads/priority-donate-chain.c:94)
+0x000000800420721d: kernel_thread (threads/thread.c:409)

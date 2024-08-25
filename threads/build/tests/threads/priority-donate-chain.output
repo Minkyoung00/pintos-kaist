@@ -4,7 +4,7 @@ Kernel command line: -q run priority-donate-chain
 Pintos booting with: 
 	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
 	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
-Calibrating timer...  209,510,400 loops/s.
+Calibrating timer...  419,020,800 loops/s.
 Boot complete.
 Executing 'priority-donate-chain':
 (priority-donate-chain) begin
@@ -24,8 +24,8 @@ Thread: 0 idle ticks, 23 kernel ticks, 0 user ticks
 Console: 1079 characters output
 Keyboard: 0 keys pressed
 Powering off...
-Kernel PANIC at ../../lib/kernel/list.c:158 in list_insert(): assertion `is_interior (before) || is_tail (before)' failed.
-Call stack: 0x8004213338 0x8004213881 0x8004213b29 0x80042098c2 0x8004209d23 0x8004219697 0x80042071a0.
+Kernel PANIC at ../../threads/thread.c:281 in thread_current(): assertion `t->status == THREAD_RUNNING' failed.
+Call stack: 0x80042133b5 0x8004206f2f 0x8004206e6b 0x8004219736 0x800420721d.
 The `backtrace' program can make call stacks useful.
 Read "Backtraces" in the "Debugging Tools" chapter
 of the Pintos documentation for more information.
