@@ -153,5 +153,4 @@ void Thread_WakeUp();
 
 static bool sleep_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 
-static bool priority_less (const struct list_elem *a_, 
-	const struct list_elem *b_, void *aux UNUSED);
+static bool priority_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
