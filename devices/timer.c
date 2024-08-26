@@ -99,7 +99,7 @@ wait_t_less(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED){
 	const struct wait_elem *a = list_entry (a_, struct wait_elem, elem);
 	const struct wait_elem *b = list_entry (b_, struct wait_elem, elem);
-	// msg("%d %d %d",a->wake_t, b->wake_t, a->wake_t < b->wake_t);
+
 	return a->wake_t < b->wake_t;
 }
 
@@ -108,7 +108,7 @@ wait_priority_more(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED){
 	const struct wait_elem *a = list_entry (a_, struct wait_elem, elem);
 	const struct wait_elem *b = list_entry (b_, struct wait_elem, elem);
-	// msg("%d %d %d",a->wake_t, b->wake_t, a->wake_t < b->wake_t);
+
 	return a->priority > b->priority;
 }
 
@@ -129,7 +129,7 @@ timer_sleep (int64_t ticks) {
 
 	if (thread_current()->priority != PRI_DEFAULT)
 		list_insert_ordered(&TOWAKE_list, &(cur_thrd.elem), wait_priority_more, NULL); 
-		
+
 	else list_insert_ordered(&TOWAKE_list, &(cur_thrd.elem), wait_t_less, NULL); 
 	// list_push_back(&TOWAKE_list,&(cur_thrd.elem));
 
