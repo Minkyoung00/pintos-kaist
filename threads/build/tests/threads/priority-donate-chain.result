@@ -1,9 +1,9 @@
 FAIL
-Kernel panic in run: PANIC at ../../tests/threads/tests.c:60 in run_test(): no test named "priority-donate-chain"
-Call stack: 0x800421339f 0x8004216860 0x8004206636 0x8004206783 0x8004206120
+Kernel panic in run: PANIC at ../../threads/thread.c:281 in thread_current(): assertion `t->status == THREAD_RUNNING' failed.
+Call stack: 0x80042133b5 0x8004206f2f 0x8004206e6b 0x8004219736 0x800420721d
 Translation of call stack:
-0x000000800421339f: debug_panic (lib/kernel/debug.c:32)
-0x0000008004216860: run_test (tests/threads/tests.c:61)
-0x0000008004206636: run_task (threads/init.c:252)
-0x0000008004206783: run_actions (threads/init.c:297)
-0x0000008004206120: main (threads/init.c:125)
+0x00000080042133b5: debug_panic (lib/kernel/debug.c:32)
+0x0000008004206f2f: thread_current (threads/thread.c:283)
+0x0000008004206e6b: thread_name (threads/thread.c:265)
+0x0000008004219736: donor_thread_func (tests/threads/priority-donate-chain.c:94)
+0x000000800420721d: kernel_thread (threads/thread.c:409)

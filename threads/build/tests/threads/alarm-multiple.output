@@ -7,7 +7,7 @@ Pintos booting with:
 Calibrating timer...  419,020,800 loops/s.
 Boot complete.
 Executing 'alarm-multiple':
-(alarm-multiple) begin :: alarm-multiple
+(alarm-multiple) begin
 (alarm-multiple) Creating 5 threads to sleep 7 times each.
 (alarm-multiple) Thread 0 sleeps 10 ticks each time,
 (alarm-multiple) thread 1 sleeps 20 ticks each time, and so on.
@@ -52,6 +52,6 @@ Executing 'alarm-multiple':
 Execution of 'alarm-multiple' complete.
 Timer: 576 ticks
 Thread: 550 idle ticks, 26 kernel ticks, 0 user ticks
-Console: 3013 characters output
+Console: 2995 characters output
 Keyboard: 0 keys pressed
 Powering off...
