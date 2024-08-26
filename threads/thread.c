@@ -28,6 +28,7 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+/* Project 1. Alarm Clock */
 static struct list ToWake_list;
 
 /* Idle thread. */
@@ -118,6 +119,7 @@ thread_init (void) {
 	initial_thread->status = THREAD_RUNNING;
 	initial_thread->tid = allocate_tid ();
 
+	/* Project 1. Alarm Clock */
 	list_init(&ToWake_list);
 }
 
@@ -158,6 +160,10 @@ thread_tick (void) {
 		intr_yield_on_return ();
 }
 
+/////////////////////////////////////////////////////////////////////////////////
+/* Project 1. Alarm Clock */
+/////////////////////////////////////////////////////////////////////////////////
+
 static bool
 wait_t_less(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED){
@@ -177,12 +183,9 @@ thread_sleep (int64_t start, int64_t ticks) {
 	cur_thrd.wake_t = start + ticks;
 	cur_thrd.priority = thread_current()->priority;
 
-	enum intr_level old_level = intr_disable();
-
 	list_insert_ordered(&ToWake_list, &(cur_thrd.elem), wait_t_less, NULL); 
+	// Using list_push_back is not good idea.
 	// list_push_back(&TOWAKE_list,&(cur_thrd.elem));
-
-	intr_set_level (old_level);
 
 	sema_down(&sema);
 }
@@ -201,6 +204,8 @@ thread_wake (int64_t ticks) {
 		else break;
 	}
 }
+/////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
 
 /* Prints thread statistics. */
 void
