@@ -1,11 +1,9 @@
 FAIL
-Kernel panic in run: PANIC at ../../tests/threads/tests.c:93 in fail(): test failed
-Call stack: 0x80042133b5 0x80042169b7 0x80042199f3 0x80042167f1 0x8004206636 0x8004206783 0x8004206120
+Kernel panic in run: PANIC at ../../tests/threads/tests.c:60 in run_test(): no test named "mlfqs-load-1"
+Call stack: 0x800421339f 0x8004216860 0x8004206636 0x8004206783 0x8004206120
 Translation of call stack:
-0x00000080042133b5: debug_panic (lib/kernel/debug.c:32)
-0x00000080042169b7: pass (tests/threads/tests.c:99)
-0x00000080042199f3: test_mlfqs_load_1 (tests/threads/mlfqs/mlfqs-load-1.c:31)
-0x00000080042167f1: run_test (tests/threads/tests.c:57)
+0x000000800421339f: debug_panic (lib/kernel/debug.c:32)
+0x0000008004216860: run_test (tests/threads/tests.c:61)
 0x0000008004206636: run_task (threads/init.c:252)
 0x0000008004206783: run_actions (threads/init.c:297)
 0x0000008004206120: main (threads/init.c:125)
