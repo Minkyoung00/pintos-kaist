@@ -28,6 +28,8 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+static struct list ToWake_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -115,6 +117,8 @@ thread_init (void) {
 	init_thread (initial_thread, "main", PRI_DEFAULT);
 	initial_thread->status = THREAD_RUNNING;
 	initial_thread->tid = allocate_tid ();
+
+	list_init(&ToWake_list);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -152,6 +156,50 @@ thread_tick (void) {
 	/* Enforce preemption. */
 	if (++thread_ticks >= TIME_SLICE)
 		intr_yield_on_return ();
+}
+
+static bool
+wait_t_less(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED){
+	const struct wait_elem *a = list_entry (a_, struct wait_elem, elem);
+	const struct wait_elem *b = list_entry (b_, struct wait_elem, elem);
+
+	return a->wake_t < b->wake_t;
+}
+
+void
+thread_sleep (int64_t start, int64_t ticks) {
+	struct semaphore sema;
+	sema_init(&sema, 0);
+
+	struct wait_elem cur_thrd;
+	cur_thrd.sema = &sema;
+	cur_thrd.wake_t = start + ticks;
+	cur_thrd.priority = thread_current()->priority;
+
+	enum intr_level old_level = intr_disable();
+
+	list_insert_ordered(&ToWake_list, &(cur_thrd.elem), wait_t_less, NULL); 
+	// list_push_back(&TOWAKE_list,&(cur_thrd.elem));
+
+	intr_set_level (old_level);
+
+	sema_down(&sema);
+}
+
+void
+thread_wake (int64_t ticks) {
+
+	while(!list_empty(&ToWake_list)){
+		struct wait_elem *victim 
+			= list_entry (list_front (&ToWake_list), struct wait_elem, elem);
+
+		if (victim->wake_t <= ticks){
+			list_pop_front(&ToWake_list);
+			sema_up(victim->sema);
+		}
+		else break;
+	}
 }
 
 /* Prints thread statistics. */
@@ -224,6 +272,15 @@ thread_block (void) {
 	schedule ();
 }
 
+static bool
+wait_priority_more(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED){
+	const struct thread *a = list_entry (a_, struct thread, elem);
+	const struct thread *b = list_entry (b_, struct thread, elem);
+
+	return a->priority > b->priority;
+}
+
 /* Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
@@ -240,7 +297,8 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	// list_push_back (&ready_list, &t->elem);
+	list_insert_ordered (&ready_list, &t->elem, wait_priority_more, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -388,6 +446,7 @@ idle (void *idle_started_ UNUSED) {
 static void
 kernel_thread (thread_func *function, void *aux) {
 	ASSERT (function != NULL);
+	enum intr_level old_level = intr_get_level ();
 
 	intr_enable ();       /* The scheduler runs with interrupts off. */
 	function (aux);       /* Execute the thread function. */

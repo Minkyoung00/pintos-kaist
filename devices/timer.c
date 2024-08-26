@@ -23,7 +23,6 @@ static int64_t ticks;
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
-static struct list TOWAKE_list;
 
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
@@ -46,7 +45,6 @@ timer_init (void) {
 	outb (0x40, count & 0xff);
 	outb (0x40, count >> 8);
 
-	list_init(&TOWAKE_list);
 	intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
 
@@ -85,6 +83,7 @@ timer_ticks (void) {
 	intr_enable(); 				   // 위의 코드랑 같은 기능(?)
 	barrier ();
 	return t;
+
 }
 
 /* Returns the number of timer ticks elapsed since THEN, which
@@ -103,15 +102,6 @@ wait_t_less(const struct list_elem *a_, const struct list_elem *b_,
 	return a->wake_t < b->wake_t;
 }
 
-static bool
-wait_priority_more(const struct list_elem *a_, const struct list_elem *b_,
-            void *aux UNUSED){
-	const struct wait_elem *a = list_entry (a_, struct wait_elem, elem);
-	const struct wait_elem *b = list_entry (b_, struct wait_elem, elem);
-
-	return a->priority > b->priority;
-}
-
 /* Suspends execution for approximately TICKS timer ticks. */
 void
 timer_sleep (int64_t ticks) {
@@ -119,21 +109,8 @@ timer_sleep (int64_t ticks) {
 									
 	ASSERT (intr_get_level () == INTR_ON);
 
-	struct semaphore sema;
-	sema_init(&sema, 0);
+	thread_sleep(start, ticks);
 
-	struct wait_elem cur_thrd;
-	cur_thrd.sema = &sema;
-	cur_thrd.wake_t = start + ticks;
-	cur_thrd.priority = thread_current()->priority;
-
-	if (thread_current()->priority != PRI_DEFAULT)
-		list_insert_ordered(&TOWAKE_list, &(cur_thrd.elem), wait_priority_more, NULL); 
-
-	else list_insert_ordered(&TOWAKE_list, &(cur_thrd.elem), wait_t_less, NULL); 
-	// list_push_back(&TOWAKE_list,&(cur_thrd.elem));
-
-	sema_down(&sema);
 	// while (timer_elapsed (start) < ticks)
 	// 	thread_yield ();
 }
@@ -168,20 +145,8 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	ASSERT (intr_get_level () == INTR_OFF);
 	ticks++; 
 	thread_tick ();
-	
-	while(!list_empty(&TOWAKE_list)){
-		
-		struct wait_elem *victim 
-			= list_entry (list_front (&TOWAKE_list), struct wait_elem, elem);
-		if (victim->wake_t <= ticks){
-			list_pop_front(&TOWAKE_list);
-			sema_up(victim->sema);
-		}
-		else {
-			// list_push_back (&TOWAKE_list,&(victim->elem));
-			break;
-		};
-	}
+
+	thread_wake (ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

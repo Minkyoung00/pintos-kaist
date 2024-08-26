@@ -109,6 +109,13 @@ struct thread {
 	unsigned magic;                     /* Detects stack overflow. */
 };
 
+struct wait_elem{
+    struct list_elem elem;
+    int64_t wake_t;
+    struct semaphore *sema;
+    int priority;
+};
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
