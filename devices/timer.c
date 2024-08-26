@@ -23,12 +23,16 @@ static int64_t ticks;
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
+static struct list TOWAKE_list;
 
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 
+/* init.c에서 호출*/
+/* 일정한 간격으로 인터럽트를 발생시켜, 운영체제나 다른 시스템 SW가 */
+/* 시간을 추적하거나 특정 작업을 일정 주기로 수행하도록 하는 타이머칩 실행*/
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
    corresponding interrupt. */
@@ -42,6 +46,7 @@ timer_init (void) {
 	outb (0x40, count & 0xff);
 	outb (0x40, count >> 8);
 
+	list_init(&TOWAKE_list);
 	intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
 
@@ -71,11 +76,13 @@ timer_calibrate (void) {
 }
 
 /* Returns the number of timer ticks since the OS booted. */
+/* */
 int64_t
 timer_ticks (void) {
-	enum intr_level old_level = intr_disable ();
+	enum intr_level old_level = intr_disable (); // 인터럽트를 비활성화하고 이전 상태값 old_level에 저장 
 	int64_t t = ticks;
-	intr_set_level (old_level);
+	// intr_set_level (old_level); // 인터럽트 활성화
+	intr_enable(); 				   // 위의 코드랑 같은 기능(?)
 	barrier ();
 	return t;
 }
@@ -87,14 +94,48 @@ timer_elapsed (int64_t then) {
 	return timer_ticks () - then;
 }
 
+static bool
+wait_t_less(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED){
+	const struct wait_elem *a = list_entry (a_, struct wait_elem, elem);
+	const struct wait_elem *b = list_entry (b_, struct wait_elem, elem);
+	// msg("%d %d %d",a->wake_t, b->wake_t, a->wake_t < b->wake_t);
+	return a->wake_t < b->wake_t;
+}
+
+static bool
+wait_priority_more(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED){
+	const struct wait_elem *a = list_entry (a_, struct wait_elem, elem);
+	const struct wait_elem *b = list_entry (b_, struct wait_elem, elem);
+	// msg("%d %d %d",a->wake_t, b->wake_t, a->wake_t < b->wake_t);
+	return a->priority > b->priority;
+}
+
 /* Suspends execution for approximately TICKS timer ticks. */
 void
 timer_sleep (int64_t ticks) {
-	int64_t start = timer_ticks ();
-
+	int64_t start = timer_ticks (); 
+									
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+
+	struct semaphore sema;
+	sema_init(&sema, 0);
+
+	struct wait_elem cur_thrd;
+	cur_thrd.sema = &sema;
+	cur_thrd.wake_t = start + ticks;
+	cur_thrd.priority = thread_current()->priority;
+
+	if (thread_current()->priority != PRI_DEFAULT)
+		list_insert_ordered(&TOWAKE_list, &(cur_thrd.elem), wait_priority_more, NULL); 
+		
+	else list_insert_ordered(&TOWAKE_list, &(cur_thrd.elem), wait_t_less, NULL); 
+	// list_push_back(&TOWAKE_list,&(cur_thrd.elem));
+
+	sema_down(&sema);
+	// while (timer_elapsed (start) < ticks)
+	// 	thread_yield ();
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -124,8 +165,23 @@ timer_print_stats (void) {
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
-	ticks++;
+	ASSERT (intr_get_level () == INTR_OFF);
+	ticks++; 
 	thread_tick ();
+	
+	while(!list_empty(&TOWAKE_list)){
+		
+		struct wait_elem *victim 
+			= list_entry (list_front (&TOWAKE_list), struct wait_elem, elem);
+		if (victim->wake_t <= ticks){
+			list_pop_front(&TOWAKE_list);
+			sema_up(victim->sema);
+		}
+		else {
+			// list_push_back (&TOWAKE_list,&(victim->elem));
+			break;
+		};
+	}
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
