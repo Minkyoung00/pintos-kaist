@@ -149,6 +149,7 @@ void do_iret (struct intr_frame *tf);
 
 void Thread_Sleep(int64_t wakeTime);
 void Thread_WakeUp();
+void Thread_Preempt();
 
 
 static bool sleep_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);

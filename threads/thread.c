@@ -245,6 +245,7 @@ thread_unblock (struct thread *t) {
 	//list_push_back (&ready_list, &t->elem);
 	list_insert_ordered(&ready_list, &(t->elem), priority_less, NULL);
 	t->status = THREAD_READY;
+	Thread_Preempt();
 	intr_set_level (old_level);
 }
 
@@ -317,6 +318,7 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
+		//list_push_back (&ready_list, &curr->elem);
 		list_insert_ordered(&ready_list, &(curr->elem), priority_less, NULL);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
@@ -643,4 +645,17 @@ static bool sleep_less (const struct list_elem *a_,
   const struct thread *b = list_entry (b_, struct thread, elem);
   
   return a->wakeTime < b->wakeTime;
+}
+
+
+void Thread_Preempt()
+{
+	struct thread* cur = thread_current();
+	if(cur == idle_thread) return;
+	struct thread* front = list_entry(list_front(&ready_list), struct thread, elem);
+	
+	// 우선순위 이상 없음. 넘겨
+	if(cur->priority > front->priority) return;
+
+	thread_yield();
 }
