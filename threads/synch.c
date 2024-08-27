@@ -57,6 +57,16 @@ sema_init (struct semaphore *sema, unsigned value) {
    interrupts disabled, but if it sleeps then the next scheduled
    thread will probably turn interrupts back on. This is
    sema_down function. */
+
+static bool
+priority_more(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED){
+	const struct thread *a = list_entry (a_, struct thread, elem);
+	const struct thread *b = list_entry (b_, struct thread, elem);
+
+	return a->priority > b->priority;
+}
+
 void
 sema_down (struct semaphore *sema) {
 	enum intr_level old_level;
@@ -65,8 +75,10 @@ sema_down (struct semaphore *sema) {
 	ASSERT (!intr_context ());
 
 	old_level = intr_disable ();
-	while (sema->value == 0) {
-		list_push_back (&sema->waiters, &thread_current ()->elem);
+	// while (sema->value == 0)
+	if (sema->value == 0)
+	{ // 잠김 상태면
+		list_insert_ordered (&sema->waiters, &thread_current ()->elem, priority_more, NULL);
 		thread_block ();
 	}
 	sema->value--;
@@ -187,8 +199,26 @@ lock_acquire (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
+	
+	
+	// 우선순위 역전 방지를 위한 priority donation
+	if (lock->holder == NULL)								// 아무도 lock 하지 않았을 때
+	{	
+		lock->ori_priority = thread_get_priority();			// 현재 스레드 priority 값이 복원값
+		thread_current()->donated = false;
+	}
+	else if ((thread_get_priority() > (lock->holder->priority)))
+	{
+		if (lock->holder->donated == true)
+		{
+			lock->ori_priority = lock->holder->priority;		// lock의 복원 값을 설정하고	
+		}
+		lock->holder->donated = true;
+		lock->holder->priority = thread_get_priority();		// lock holder의 priority를 현재로 설정
+	}
 
 	sema_down (&lock->semaphore);
+	
 	lock->holder = thread_current ();
 }
 
@@ -222,6 +252,11 @@ lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 
+	if (lock->ori_priority != NULL){
+		thread_current()->priority = lock->ori_priority;
+		lock->ori_priority = NULL;
+	}
+	
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
 }
