@@ -200,26 +200,21 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 	
+	
 	// 우선순위 역전 방지를 위한 priority donation
-	if (lock->holder != NULL)
+	if (lock->holder == NULL)								// 아무도 lock 하지 않았을 때
 	{	
-		if ((thread_get_priority() > (lock->holder->priority)))
-		{
-			// list_insert_ordered (&lock->holder->donated_list,
-			// 					&thread_current()->elem, priority_more, NULL);
-			msg("push %d in %s thread's list",thread_current()->priority, lock->holder->name);
-			list_push_front(&lock->holder->donated_list, &thread_current()->elem);
-			msg(" %s thread's list: front %d back %d", lock->holder->name,
-				list_entry(list_front(&lock->holder->donated_list), struct thread, elem)->priority,
-				list_entry(list_back(&lock->holder->donated_list), struct thread, elem)->priority);
-			
-			lock->holder->priority = thread_get_priority();		// lock holder의 priority를 현재로 설정
-			lock->holder->is_donated = true;
-		}
+		lock->ori_priority = thread_get_priority();			// 현재 스레드 priority 값이 복원값
+		thread_current()->donated = false;
 	}
-	else{
-		// list_init(&thread_current()->donated_list);
-		// thread_current()->origin_priority = thread_get_priority();
+	else if ((thread_get_priority() > (lock->holder->priority)))
+	{
+		if (lock->holder->donated == true)
+		{
+			lock->ori_priority = lock->holder->priority;		// lock의 복원 값을 설정하고	
+		}
+		lock->holder->donated = true;
+		lock->holder->priority = thread_get_priority();		// lock holder의 priority를 현재로 설정
 	}
 
 	sema_down (&lock->semaphore);
@@ -257,20 +252,11 @@ lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 
-	struct thread *t = thread_current();
-	// msg("releasing current: %s", thread_name());
-
-	if (!list_empty(&t->donated_list)){
-		// msg("lock->holder->donated_list: front %d back %d", 
-		// 		list_entry(list_front(&t->donated_list), struct thread, elem)->priority,
-		// 		list_entry(list_back(&t->donated_list), struct thread, elem)->priority);
-		struct list_elem *front = list_pop_front(&t->donated_list);
-		t->priority = list_entry(front, struct thread, elem)->priority;
-		// msg("is it work???");
-		// lock->ori_priority = NULL;
+	if (lock->ori_priority != NULL){
+		thread_current()->priority = lock->ori_priority;
+		lock->ori_priority = NULL;
 	}
 	
-	t->is_donated = false;
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
 }
