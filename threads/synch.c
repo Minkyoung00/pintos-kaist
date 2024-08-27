@@ -183,6 +183,7 @@ lock_init (struct lock *lock) {
 	ASSERT (lock != NULL);
 
 	lock->holder = NULL;
+	lock->ori_priority = NULL;
 	sema_init (&lock->semaphore, 1);
 }
 
@@ -205,15 +206,20 @@ lock_acquire (struct lock *lock) {
 	if (lock->holder == NULL)								// 아무도 lock 하지 않았을 때
 	{	
 		lock->ori_priority = thread_get_priority();			// 현재 스레드 priority 값이 복원값
-		thread_current()->donated = false;
+		lock->donated = false;
+		// thread_current()->donated = false;
 	}
 	else if ((thread_get_priority() > (lock->holder->priority)))
 	{
-		if (lock->holder->donated == true)
+		if (lock->donated == 0) // lock->donated가 false면
 		{
+			// msg("lock->holder->donated: %d", lock->holder->donated);
+			// msg("lock->holder: %s", lock->holder->name);
+			lock->donated = true;
 			lock->ori_priority = lock->holder->priority;		// lock의 복원 값을 설정하고	
+			// msg("lock->holder->donated: %d", lock->holder->donated);
 		}
-		lock->holder->donated = true;
+		
 		lock->holder->priority = thread_get_priority();		// lock holder의 priority를 현재로 설정
 	}
 
@@ -257,6 +263,7 @@ lock_release (struct lock *lock) {
 		lock->ori_priority = NULL;
 	}
 	
+	lock->donated = false;
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
 }
