@@ -92,6 +92,9 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 	struct semaphore *sema;
+	
+	int origin_priority;
+	int donated_cnt;
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */

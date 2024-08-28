@@ -261,6 +261,11 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
+	struct thread *cur =  thread_current();
+	if((cur->priority < t->priority) && (cur != idle_thread)){ 
+		thread_yield();
+	}
+
 	return tid;
 }
 
@@ -315,10 +320,10 @@ thread_unblock (struct thread *t) {
 	/////////////////////////////////////////////////////////////////////////////////
 	/* Project 1. Priority Schedulling */
 	/////////////////////////////////////////////////////////////////////////////////
-	struct thread *cur =  thread_current();
-	if((cur->priority < t->priority) && (cur != idle_thread)){ 
-		thread_yield();
-	}
+	// struct thread *cur =  thread_current();
+	// if((cur->priority < t->priority) && (cur != idle_thread)){ 
+	// 	thread_yield();
+	// }
 	/////////////////////////////////////////////////////////////////////////////////
 
 	intr_set_level (old_level);
@@ -503,6 +508,9 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+
+	t->origin_priority = priority;
+	t->donated_cnt = 0;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

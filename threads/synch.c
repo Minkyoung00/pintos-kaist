@@ -75,8 +75,7 @@ sema_down (struct semaphore *sema) {
 	ASSERT (!intr_context ());
 
 	old_level = intr_disable ();
-	// while (sema->value == 0)
-	if (sema->value == 0)
+	while (sema->value == 0)
 	{ // 잠김 상태면
 		list_insert_ordered (&sema->waiters, &thread_current ()->elem, priority_more, NULL);
 		thread_block ();
@@ -122,9 +121,21 @@ sema_up (struct semaphore *sema) {
 
 	old_level = intr_disable ();
 	if (!list_empty (&sema->waiters))
-		thread_unblock (list_entry (list_pop_front (&sema->waiters),
-					struct thread, elem));
-	sema->value++;
+	{
+		struct thread *front = list_entry (list_pop_front (&sema->waiters),
+											struct thread, elem);
+		thread_unblock (front);
+
+		sema->value++;
+
+		struct thread *cur =  thread_current();
+		if((cur->priority < front->priority)&& !intr_context())
+		{ 
+			thread_yield();
+		}
+	}
+	else sema->value++;
+
 	intr_set_level (old_level);
 }
 
@@ -201,26 +212,23 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 	
-	
 	// 우선순위 역전 방지를 위한 priority donation
 	if (lock->holder == NULL)								// 아무도 lock 하지 않았을 때
 	{	
 		lock->ori_priority = thread_get_priority();			// 현재 스레드 priority 값이 복원값
 		lock->donated = false;
-		// thread_current()->donated = false;
 	}
+
 	else if ((thread_get_priority() > (lock->holder->priority)))
 	{
 		if (lock->donated == 0) // lock->donated가 false면
 		{
-			// msg("lock->holder->donated: %d", lock->holder->donated);
-			// msg("lock->holder: %s", lock->holder->name);
 			lock->donated = true;
 			lock->ori_priority = lock->holder->priority;		// lock의 복원 값을 설정하고	
-			// msg("lock->holder->donated: %d", lock->holder->donated);
 		}
 		
 		lock->holder->priority = thread_get_priority();		// lock holder의 priority를 현재로 설정
+		lock->holder->donated_cnt += 1;
 	}
 
 	sema_down (&lock->semaphore);
@@ -258,11 +266,25 @@ lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 
-	if (lock->ori_priority != NULL){
-		thread_current()->priority = lock->ori_priority;
-		lock->ori_priority = NULL;
+	if (lock->ori_priority != NULL && lock->donated)
+	{
+		thread_current()->donated_cnt -= 1;
+		// msg("%d", thread_current()->donated_cnt);
+		
+		if (lock->holder->priority 
+			== list_entry(list_front(&(&lock->semaphore)->waiters),
+			struct thread, elem)->priority)
+		{
+			thread_current()->priority = lock->ori_priority;
+			lock->ori_priority = NULL;
+		}
+		if (thread_current()->donated_cnt == 0)
+		{
+			// msg("%d", thread_current()->origin_priority);
+			thread_current()->priority = thread_current()->origin_priority;
+		}
 	}
-	
+
 	lock->donated = false;
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
