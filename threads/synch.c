@@ -198,48 +198,9 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
-	int priDonated = 0;
-	// 록을 잠구려고 보니 이미 다른 친구가 점유하고있음. 나보다 우선순위도 낮음.
-	if(lock->semaphore.value == 0 && lock->holder != NULL)
-	{
-		priority_donate(lock->holder, lock);
-	}
 
 	sema_down (&lock->semaphore);
 	lock->holder = thread_current ();
-	thread_current()->priority += priDonated;
-}
-
-void priority_donate(struct thread* target, struct lock* lock)
-{
-	struct thread* current = thread_current();
-	ASSERT (target->priority < current->priority);
-	ASSERT (lock != NULL);
-	
-	// priority 기부
-	int diff = current->priority - target->priority;
-	current->priority -= diff;
-	target->priority += diff;
-
-	struct donater_elem don;
-	don.thread = current;
-	don.donated = diff;
-	list_push_back(&lock->donaters, &don.elem);
-}		
-
-void priority_donate_release(struct lock* lock)
-{
-	struct thread* curThread = thread_current();
-	
-	while (list_empty(&lock->donaters))
-	{
-		struct list_elem *cur = list_pop_back(&lock->donaters);
-		// 기부 받은거 다시 돌려줌
-		struct donater_elem *elem = list_entry(cur, struct donater_elem, elem);
-		elem->thread->priority += elem->donated;
-		curThread->priority -= elem->donated;
-	}
-	
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -273,7 +234,6 @@ lock_release (struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	lock->holder = NULL;
-	//priority_donate_release(lock);
 	sema_up (&lock->semaphore);
 }
 
@@ -344,13 +304,9 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	sema_init (&waiter.semaphore, 0);
-  	msg ("Thread 1 cond_wait.");
 	list_push_back (&cond->waiters, &waiter.elem);
-  	msg ("Thread 2 cond_wait.");
 	lock_release (lock);
-  	msg ("Thread 3 cond_wait.");
 	sema_down (&waiter.semaphore);
-  	msg ("Thread 4 cond_wait.");
 	lock_acquire (lock);
 }
 

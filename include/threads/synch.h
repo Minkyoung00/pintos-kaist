@@ -20,22 +20,11 @@ void sema_self_test (void);
 struct lock {
 	struct thread *holder;      /* Thread holding lock (for debugging). */
 	struct semaphore semaphore; /* Binary semaphore controlling access. */
-
-	struct list donaters;	// 기부자들 리스트. donater_elem 구조체 객체 받음
-};
-
-struct donater_elem
-{
-	struct thread* thread;
-	struct list_elem elem;
-	int donated;
 };
 
 void lock_init (struct lock *);
 void lock_acquire (struct lock *);
 
-void priority_donate(struct thread* target, struct lock* lock);
-void priority_donate_release(struct lock* lock);
 bool lock_try_acquire (struct lock *);
 void lock_release (struct lock *);
 bool lock_held_by_current_thread (const struct lock *);
