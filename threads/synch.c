@@ -74,7 +74,7 @@ sema_down (struct semaphore *sema) {
 	ASSERT (!intr_context ());
 
 	old_level = intr_disable ();
-	/*while*/if (sema->value == 0) {
+	while (sema->value == 0) {
 		// list_push_back (&sema->waiters, &thread_current ()->elem);
 		list_insert_ordered(&sema->waiters, &thread_current ()->elem, priority_less, NULL);
 		thread_block ();
@@ -119,10 +119,10 @@ sema_up (struct semaphore *sema) {
 	ASSERT (sema != NULL);
 
 	old_level = intr_disable ();
+	sema->value++;
 	if (!list_empty (&sema->waiters))
 		thread_unblock (list_entry (list_pop_front (&sema->waiters),
 					struct thread, elem));
-	sema->value++;
 	intr_set_level (old_level);
 }
 
@@ -198,8 +198,48 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
+	int priDonated = 0;
+	// 록을 잠구려고 보니 이미 다른 친구가 점유하고있음. 나보다 우선순위도 낮음.
+	if(lock->semaphore.value == 0 && lock->holder != NULL)
+	{
+		priority_donate(lock->holder, lock);
+	}
+
 	sema_down (&lock->semaphore);
 	lock->holder = thread_current ();
+	thread_current()->priority += priDonated;
+}
+
+void priority_donate(struct thread* target, struct lock* lock)
+{
+	struct thread* current = thread_current();
+	ASSERT (target->priority < current->priority);
+	ASSERT (lock != NULL);
+	
+	// priority 기부
+	int diff = current->priority - target->priority;
+	current->priority -= diff;
+	target->priority += diff;
+
+	struct donater_elem don;
+	don.thread = current;
+	don.donated = diff;
+	list_push_back(&lock->donaters, &don.elem);
+}		
+
+void priority_donate_release(struct lock* lock)
+{
+	struct thread* curThread = thread_current();
+	
+	while (list_empty(&lock->donaters))
+	{
+		struct list_elem *cur = list_pop_back(&lock->donaters);
+		// 기부 받은거 다시 돌려줌
+		struct donater_elem *elem = list_entry(cur, struct donater_elem, elem);
+		elem->thread->priority += elem->donated;
+		curThread->priority -= elem->donated;
+	}
+	
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -233,6 +273,7 @@ lock_release (struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	lock->holder = NULL;
+	//priority_donate_release(lock);
 	sema_up (&lock->semaphore);
 }
 
@@ -303,9 +344,13 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	sema_init (&waiter.semaphore, 0);
+  	msg ("Thread 1 cond_wait.");
 	list_push_back (&cond->waiters, &waiter.elem);
+  	msg ("Thread 2 cond_wait.");
 	lock_release (lock);
+  	msg ("Thread 3 cond_wait.");
 	sema_down (&waiter.semaphore);
+  	msg ("Thread 4 cond_wait.");
 	lock_acquire (lock);
 }
 
@@ -325,6 +370,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 
 	if (!list_empty (&cond->waiters))
 	{
+		// 세마포어 안에 있는 쓰레드 중 가장 우선순위가 높은 친구 꺼내줌
 		struct list_elem* max = list_max(&cond->waiters, sema_greater, NULL);
 		list_remove(max);
 		sema_up(&list_entry(max, struct semaphore_elem, elem)->semaphore);
