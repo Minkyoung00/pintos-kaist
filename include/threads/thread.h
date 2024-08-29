@@ -91,8 +91,8 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
-	struct semaphore *sema;
 	
+	struct semaphore *sema;
 	int origin_priority;
 	int donated_cnt;
 
@@ -153,5 +153,9 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+
+void thread_sleep (int64_t start, int64_t ticks);
+void thread_wake (int64_t ticks);
+void update_list(struct list* list, struct thread *t);
 
 #endif /* threads/thread.h */

@@ -396,12 +396,29 @@ void
 update_list(struct list* list, struct thread *t){
 	list_remove(&t->elem);
 	list_insert_ordered (list, &t->elem, priority_more, NULL);
+
+	// struct list_elem *e;
+
+	// for (e = list_next(&t->elem); e != list_end(list); e = list_next(e)) 
+	// {
+    //     if (priority_more(&t->elem, e, NULL))
+    //         break;
+    // }
+			
+	// list_insert (e, &t->elem);
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	struct thread *t = thread_current ();
+	if (t->donated_cnt == 0)
+	{
+		t->priority = new_priority;
+	}
+	else
+		t->origin_priority = new_priority;
+
 
 	if(!list_empty(&ready_list)){
 		if (list_entry(list_front (&ready_list),struct thread, elem)->priority 
