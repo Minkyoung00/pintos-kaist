@@ -94,6 +94,8 @@ struct thread {
 
 	int64_t wakeTime;
 	struct list lock_list;
+	
+	struct lock* waitLock;
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
