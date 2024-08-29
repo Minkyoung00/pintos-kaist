@@ -58,6 +58,15 @@ static bool priority_less (const struct list_elem *a_,
   
   return a->priority > b->priority;
 }
+
+static bool lock_less (const struct list_elem *a_, 
+	const struct list_elem *b_, void *aux UNUSED)
+{
+  const struct lock *a = list_entry (a_, struct lock, elem);
+  const struct lock *b = list_entry (b_, struct lock, elem);
+  
+  return a->oldPriority < b->oldPriority;
+}
 /* Down or "P" operation on a semaphore.  Waits for SEMA's value
    to become positive and then atomically decrements it.
 
@@ -181,7 +190,7 @@ lock_init (struct lock *lock) {
 	ASSERT (lock != NULL);
 
 	lock->holder = NULL;
-	lock->initPriority = 0;
+	lock->oldPriority = LOCKINITPRI;
 	sema_init (&lock->semaphore, 1);
 }
 
@@ -358,14 +367,30 @@ void priority_donate(struct lock* lock)
 {	
 	if(lock->holder != NULL)
 	{
-		if(lock->initPriority == 0) lock->initPriority = lock->holder->priority;
-		
+		if(lock->oldPriority == LOCKINITPRI)
+		{
+			lock->oldPriority = lock->holder->priority;
+			list_insert_ordered(&lock->holder->lock_list, &lock->elem, lock_less, NULL);
+		}
+			
 		lock->holder->priority = thread_current()->priority;
 	}
 }
 void priority_donate_release(struct lock* lock)
 {
-	if(lock->initPriority != 0)
-		lock->holder->priority = lock->initPriority;
-	lock->initPriority = 0;
+	struct list_elem *cur = &(lock->elem);
+
+	if(lock->oldPriority != LOCKINITPRI)
+	{
+		if(list_next(cur) == list_end(&lock->holder->lock_list)){
+			lock->holder->priority = lock->oldPriority;
+		}
+		else
+		{
+			list_entry(list_next(cur), struct lock, elem)->oldPriority = lock->oldPriority;
+		}
+		list_remove(cur);
+	}
+
+	lock->oldPriority = LOCKINITPRI;
 }
