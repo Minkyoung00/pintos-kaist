@@ -58,6 +58,14 @@ static bool priority_less (const struct list_elem *a_,
   
   return a->priority > b->priority;
 }
+static bool priority_greater (const struct list_elem *a_, 
+	const struct list_elem *b_, void *aux UNUSED)
+{
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+  
+  return a->priority < b->priority;
+}
 
 static bool lock_less (const struct list_elem *a_, 
 	const struct list_elem *b_, void *aux UNUSED)
@@ -130,8 +138,11 @@ sema_up (struct semaphore *sema) {
 	old_level = intr_disable ();
 	sema->value++;
 	if (!list_empty (&sema->waiters))
-		thread_unblock (list_entry (list_pop_front (&sema->waiters),
-					struct thread, elem));
+	{
+		struct list_elem* mx = list_max(&sema->waiters, priority_greater, NULL);
+		list_remove(mx);
+		thread_unblock (list_entry (mx, struct thread, elem));
+	}
 	intr_set_level (old_level);
 }
 
