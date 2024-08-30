@@ -333,14 +333,16 @@ thread_set_priority (int new_priority) {
 	{
 		struct list_elem* curElem = NULL;
 		// 대신 조정될 lock 찾기
-		for(curElem = list_begin(&cur->lock_list); 
-			list_entry(curElem, struct lock, elem)->oldPriority < new_priority; curElem = curElem->next)
+		for(curElem = list_begin(&cur->lock_list); curElem != list_end(&cur->lock_list); curElem = curElem->next)
 		{
-			if (curElem->next == list_end(&cur->lock_list)) break;
+			struct lock* curLock = list_entry(curElem, struct lock, elem);
+			if(curLock->oldPriority < new_priority) curLock->oldPriority = LOCKINITPRI;
+			else
+			{
+				curLock->oldPriority = new_priority;
+				break;
+			}
 		}
-		
-		list_entry(curElem, struct lock, elem)->oldPriority = new_priority;
-		
  		return;
 	}
 	cur->priority = new_priority;
