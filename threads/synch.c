@@ -283,26 +283,24 @@ lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 
-	if (lock->ori_priority != NULL && lock->donated)
+	if (lock->donated)
 	{
 		thread_current()->donated_cnt -= 1;
 		
-		// if (lock->holder->priority 
-		// 	== list_entry(list_front(&(&lock->semaphore)->waiters),
-		// 	struct thread, elem)->priority)
 		if (lock->holder->priority 
-			== list_entry(list_max(&(&lock->semaphore)->waiters, priority_less, NULL),
+			== list_entry(list_front(&(&lock->semaphore)->waiters),
 			struct thread, elem)->priority)
 		{
 			thread_current()->priority = lock->ori_priority;
 			lock->ori_priority = NULL;
 		}
+		
 		if (thread_current()->donated_cnt == 0)
 		{
 			thread_current()->priority = thread_current()->origin_priority;
 		}
 	}
-
+	
 	lock->donated = false;
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
