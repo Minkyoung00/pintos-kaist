@@ -22,7 +22,6 @@ struct lock {
 	struct semaphore semaphore; /* Binary semaphore controlling access. */
 	
 	int ori_priority;
-	bool donated;
 };
 
 void lock_init (struct lock *);

@@ -218,22 +218,17 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 	
-	// lock 획득이 바로 가능한 경우
-	if (lock->holder == NULL)								
-	{	
-		lock->ori_priority = thread_get_priority();			
-		lock->donated = false;
-	}
+	// thread_get_priority() > lock->holder->priority 조건 확인 불필요
+	// : RUNNING 상태로 lock_acquire를 하고 있는 것은
+	//   이미 lock->holder보다 priority가 크다는 것
+	
 	// lock을 얻기 위해 기다려야 하는 경우
-	else if (thread_get_priority() > lock->holder->priority)
+	if (lock->holder != NULL)
 	{
-		// lock으로 처음 기부 받을 때
-		if (!lock->donated) 	
-		{
+		// lock으로 처음 기부 받을 때 (for Priority-Donate-One)
+		if (lock->ori_priority < 0) 	
 			lock->ori_priority = lock->holder->priority;	
-			lock->donated = true;
-		}
-
+	
 		thread_current()->waiting_lock = lock;
 		donate_priority();
 
@@ -253,7 +248,7 @@ donate_priority()
 	while(L != NULL) 
 	{
 		// 어떤 스레드가 lock을 기다린다는 건 이미 holder가 있다는 의미
-		// 바로 L->holder->priority 접근 가능
+		// 즉, L->holder->priority 접근 가능
 		// lock holder의 priority를 현재 priority로 설정
 		L->holder->priority = thread_get_priority();		
 		
@@ -295,7 +290,7 @@ lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 
-	if (lock->donated)
+	if (lock->ori_priority > -1)
 	{
 		thread_current()->donated_cnt -= 1;
 
@@ -315,7 +310,7 @@ lock_release (struct lock *lock) {
 			thread_current()->priority = thread_current()->origin_priority;
 		}
 
-		lock->donated = false;
+		lock->ori_priority = -1;
 	}
 	
 	lock->holder = NULL;
