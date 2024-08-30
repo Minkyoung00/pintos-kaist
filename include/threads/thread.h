@@ -93,8 +93,10 @@ struct thread {
 	int priority;                       /* Priority. */
 	
 	struct semaphore *sema;
+
 	int origin_priority;
 	int donated_cnt;
+	struct lock *waiting_lock; 
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */

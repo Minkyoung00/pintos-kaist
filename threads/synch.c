@@ -32,6 +32,8 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+static void donate_priority(void);
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -65,15 +67,6 @@ priority_more(const struct list_elem *a_, const struct list_elem *b_,
 	const struct thread *b = list_entry (b_, struct thread, elem);
 
 	return a->priority >= b->priority;
-}
-
-static bool
-priority_less(const struct list_elem *a_, const struct list_elem *b_,
-            void *aux UNUSED){
-	const struct thread *a = list_entry (a_, struct thread, elem);
-	const struct thread *b = list_entry (b_, struct thread, elem);
-
-	return a->priority < b->priority;
 }
 
 void
@@ -207,7 +200,7 @@ lock_init (struct lock *lock) {
 	ASSERT (lock != NULL);
 
 	lock->holder = NULL;
-	lock->ori_priority = NULL;
+	lock->ori_priority = -1;
 	sema_init (&lock->semaphore, 1);
 }
 
@@ -225,32 +218,51 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 	
-	// 우선순위 역전 방지를 위한 priority donation
-	if (lock->holder == NULL)								// 아무도 lock 하지 않았을 때
+	// lock 획득이 바로 가능한 경우
+	if (lock->holder == NULL)								
 	{	
-		lock->ori_priority = thread_get_priority();			// 현재 스레드 priority 값이 복원값
+		lock->ori_priority = thread_get_priority();			
 		lock->donated = false;
 	}
-
-	else if ((thread_get_priority() > (lock->holder->priority)))
+	// lock을 얻기 위해 기다려야 하는 경우
+	else if (thread_get_priority() > lock->holder->priority)
 	{
-		if (lock->donated == 0) // lock->donated가 false면
+		// lock으로 처음 기부 받을 때
+		if (!lock->donated) 	
 		{
+			lock->ori_priority = lock->holder->priority;	
 			lock->donated = true;
-			lock->ori_priority = lock->holder->priority;		// lock의 복원 값을 설정하고	
 		}
-		
-		lock->holder->priority = thread_get_priority();		// lock holder의 priority를 현재로 설정
-		// Project 2. Priority-Donate-sema
-		if (lock->holder->sema != NULL)
-			update_list(&lock->holder->sema->waiters, lock->holder);
-		
+
+		thread_current()->waiting_lock = lock;
+		donate_priority();
+
 		lock->holder->donated_cnt += 1;
 	}
-
 	sema_down (&lock->semaphore);
-	
+
+	thread_current()->waiting_lock = NULL;
 	lock->holder = thread_current ();
+}
+
+/* current thread가 기다리는 lock부터 시작해 연쇄적으로 priority donate*/
+static void
+donate_priority()
+{
+	struct lock *L = thread_current()->waiting_lock;
+	while(L != NULL) 
+	{
+		// 어떤 스레드가 lock을 기다린다는 건 이미 holder가 있다는 의미
+		// 바로 L->holder->priority 접근 가능
+		// lock holder의 priority를 현재 priority로 설정
+		L->holder->priority = thread_get_priority();		
+		
+		// Project 2. Priority-Donate-sema
+		if (L->holder->sema != NULL)
+			update_list(&L->holder->sema->waiters, L->holder);
+
+		L = L->holder->waiting_lock;
+	}
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -286,22 +298,26 @@ lock_release (struct lock *lock) {
 	if (lock->donated)
 	{
 		thread_current()->donated_cnt -= 1;
-		
-		if (lock->holder->priority 
-			== list_entry(list_front(&(&lock->semaphore)->waiters),
+
+		// 현재 lock holder의 priority와 다음 lock을 얻을 thread의 priority가 같으면
+		// lock에 저장된 값(holder가 해당 lock을 얻기 전 값)으로 복원
+		if (thread_current()->priority 
+			== list_entry(list_front(&lock->semaphore.waiters),
 			struct thread, elem)->priority)
 		{
 			thread_current()->priority = lock->ori_priority;
-			lock->ori_priority = NULL;
+			lock->ori_priority = -1;
 		}
-		
+		// lock holder가 마지막 기부 정리일 때
+		// 원래 thread값으로 복원
 		if (thread_current()->donated_cnt == 0)
 		{
 			thread_current()->priority = thread_current()->origin_priority;
 		}
+
+		lock->donated = false;
 	}
 	
-	lock->donated = false;
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
 }
