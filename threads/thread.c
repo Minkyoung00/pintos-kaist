@@ -402,9 +402,10 @@ update_list(struct list* list, struct thread *t){
 void
 thread_set_priority (int new_priority) {
 	struct thread *t = thread_current ();
-	if (t->donated_cnt == 0)
+	if (!t->donated_cnt)
 	{
 		t->priority = new_priority;
+		t->origin_priority = new_priority;
 	}
 	else
 		t->origin_priority = new_priority;
