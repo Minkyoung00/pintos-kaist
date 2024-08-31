@@ -30,14 +30,14 @@ typedef int tid_t;
 
 
 // 소수 연산 매크로 생성
-#define f 1<<14
-#define FLOAT(n) n*f
-#define INT(n) n/f
-#define ROUNDINT(x) (x+f/2)/ (x>=0 ? f : (x-f/2)/f)
-#define ADDFI(x, i) x+i*f
-#define MUL(x,y) ((int64_t) x) * y / f
+#define F (1<<14)
+#define FLOAT(n) n*F
+#define INT(n) n/F
+#define ROUNDINT(x) (x+F/2)/ (x>=0 ? F : (x-F/2)/F)
+#define ADDFI(x, i) x+i*F
+#define MUL(x,y) ((int64_t) x) * y / F
 #define MULFI(x,n) x*n
-#define DIV(x,y) ((int64_t) x) * f / y
+#define DIV(x,y) ((int64_t) x) * F / y
 #define DIVFI(x,n) x/n
 
 
