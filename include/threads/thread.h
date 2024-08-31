@@ -28,6 +28,19 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+
+// 소수 연산 매크로 생성
+#define f 1<<14
+#define FLOAT(n) n*f
+#define INT(n) n/f
+#define ROUNDINT(x) (x+f/2)/ (x>=0 ? f : (x-f/2)/f)
+#define ADDFI(x, i) x+i*f
+#define MUL(x,y) ((int64_t) x) * y / f
+#define MULFI(x,n) x*n
+#define DIV(x,y) ((int64_t) x) * f / y
+#define DIVFI(x,n) x/n
+
+
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -97,6 +110,8 @@ struct thread {
 	
 	struct lock* waitLock;
 
+	int nice;
+	int recent_cpu;
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
@@ -153,6 +168,8 @@ void do_iret (struct intr_frame *tf);
 void Thread_Sleep(int64_t wakeTime);
 void Thread_WakeUp();
 void Thread_Preempt();
+
+bool Donate_On_Set(int new_priority);
 
 
 static bool sleep_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);

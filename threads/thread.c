@@ -64,6 +64,8 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
+static int load_avg;
+
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -106,11 +108,13 @@ thread_init (void) {
 	};
 	lgdt (&gdt_ds);
 
-	/* Init the globla thread context */
+	/* Init the global thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&sleep_list);
 	list_init (&destruction_req);
+
+	load_avg = 0;
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -328,6 +332,20 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	struct thread* cur = thread_current ();
+
+	if(Donate_On_Set(new_priority))	return;
+	
+	cur->priority = new_priority;
+	thread_yield();
+}
+
+bool Donate_On_Set(int new_priority)
+{	
+	if(thread_mlfqs) return false;
+	
+	ASSERT(!thread_mlfqs);
+	struct thread* cur = thread_current ();
+
 	// 해당 쓰레드가 우선순위를 기부받은 상황이면
 	if(!list_empty(&cur->lock_list))
 	{
@@ -343,10 +361,10 @@ thread_set_priority (int new_priority) {
 				break;
 			}
 		}
- 		return;
+ 		return true;
 	}
-	cur->priority = new_priority;
-	thread_yield();
+
+	return false;
 }
 
 /* Returns the current thread's priority. */
@@ -358,6 +376,7 @@ thread_get_priority (void) {
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int nice UNUSED) {
+	thread_current()->nice = nice;
 	/* TODO: Your implementation goes here */
 }
 
@@ -365,21 +384,19 @@ thread_set_nice (int nice UNUSED) {
 int
 thread_get_nice (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	return thread_current()->nice;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) {
-	/* TODO: Your implementation goes here */
-	return 0;
+	return ROUNDINT(load_avg*100);
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) {
-	/* TODO: Your implementation goes here */
-	return 0;
+	return ROUNDINT(thread_current()->recent_cpu*100);
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
