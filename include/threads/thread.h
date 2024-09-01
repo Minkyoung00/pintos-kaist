@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+// #include "devices/timer.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -92,14 +93,17 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 	
-	struct semaphore *sema;
-
 	int origin_priority;
 	int donated_cnt;
+	struct semaphore *sema;
 	struct lock *waiting_lock; 
+	
+	int nice;
+	int recent_cpu;
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+	struct list_elem blocked_elem;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -115,11 +119,15 @@ struct thread {
 	unsigned magic;                     /* Detects stack overflow. */
 };
 
-struct wait_elem{
+static struct sleep_elem{
     struct list_elem elem;
-    int64_t wake_t;
     struct semaphore *sema;
-    int priority;
+    int64_t wake_t;
+};
+
+struct blocked_elem{
+	struct list_elem elem;
+	struct thread *thread;
 };
 
 /* If false (default), use round-robin scheduler.
@@ -159,5 +167,6 @@ void do_iret (struct intr_frame *tf);
 void thread_sleep (int64_t start, int64_t ticks);
 void thread_wake (int64_t ticks);
 void update_list(struct list* list, struct thread *t);
+int nice_to_priority(struct thread *t, int nice);
 
 #endif /* threads/thread.h */
