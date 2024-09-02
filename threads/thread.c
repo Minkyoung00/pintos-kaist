@@ -26,6 +26,7 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
+static struct list all_list;
 static struct list ready_list;
 static struct list sleep_list;
 
@@ -64,7 +65,7 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
-static int load_avg;
+static int load_avg = 0;
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -110,15 +111,17 @@ thread_init (void) {
 
 	/* Init the global thread context */
 	lock_init (&tid_lock);
+	list_init (&all_list);
 	list_init (&ready_list);
 	list_init (&sleep_list);
 	list_init (&destruction_req);
 
-	load_avg = 0;
+	//load_avg = 0;
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
 	init_thread (initial_thread, "main", PRI_DEFAULT);
+	initial_thread->recent_cpu = 0;
 	initial_thread->status = THREAD_RUNNING;
 	initial_thread->tid = allocate_tid ();
 }
@@ -158,6 +161,9 @@ thread_tick (void) {
 	/* Enforce preemption. */
 	if (++thread_ticks >= TIME_SLICE)
 		intr_yield_on_return ();
+	
+	if (thread_mlfqs)
+		t->recent_cpu = ADDFI(t->recent_cpu, 1);
 }
 
 /* Prints thread statistics. */
@@ -197,6 +203,7 @@ thread_create (const char *name, int priority,
 
 	/* Initialize thread. */
 	init_thread (t, name, priority);
+	list_push_back(&all_list, &t->all_elem);
 	tid = t->tid = allocate_tid ();
 
 	/* Call the kernel_thread if it scheduled.
@@ -209,6 +216,8 @@ thread_create (const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+
+	t->recent_cpu = thread_current()->recent_cpu;
 
 	/* Add to run queue. */
 	thread_unblock (t);
@@ -377,7 +386,9 @@ thread_get_priority (void) {
 void
 thread_set_nice (int nice UNUSED) {
 	thread_current()->nice = nice;
+	MLFQS_SetPri(thread_current());
 	/* TODO: Your implementation goes here */
+	
 }
 
 /* Returns the current thread's nice value. */
@@ -397,6 +408,24 @@ thread_get_load_avg (void) {
 int
 thread_get_recent_cpu (void) {
 	return ROUNDINT(thread_current()->recent_cpu*100);
+}
+
+void Fix_All_Recent_CPU()
+{
+	if(list_empty(&ready_list)) return;
+
+	struct list_elem* cur = list_front(&ready_list);
+
+	while (cur != list_end(&ready_list))
+	{
+		struct thread* curThread = list_entry(cur, struct thread, elem);
+		int recent_cpu = curThread->recent_cpu;
+		int nice = curThread->nice;
+
+		curThread->recent_cpu = ADDFI(MUL(DIV(MULFI(load_avg, 2), ADDFI(MULFI(load_avg, 2), 1)), recent_cpu), nice);
+		cur = list_next(cur);
+	}
+	
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -461,6 +490,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+
+	t->nice = 0;
 	
 	list_init(&t->lock_list);
 }
@@ -695,4 +726,36 @@ void Thread_Preempt()
 	if(cur->priority > front->priority) return;
 
 	thread_yield();
+}
+
+void Set_Load_Avg()
+{
+	ASSERT(thread_mlfqs);
+
+	int ready_threads = list_size(&ready_list);
+	if(thread_current() != idle_thread) ready_threads++;
+
+	load_avg = MUL(DIV(FLOAT(59),FLOAT(60)), load_avg) + MULFI(DIV(FLOAT(1),FLOAT(60)), ready_threads);
+	msg("load_avg:%d || ready_threads:%d", thread_get_load_avg(), ready_threads);
+}
+
+void MLFQS_SetPri(struct thread* curThread)
+{                                                                                                          
+	int recent_cpu = curThread->recent_cpu;
+	int nice = curThread->nice;
+
+	curThread->priority = SUBIF((PRI_MAX - (nice * 2)), DIVFI(recent_cpu, 4));
+}
+void MLFQS_SetPriorities()
+{
+	if(list_empty(&ready_list)) return;
+
+	struct list_elem* cur = list_front(&ready_list);
+
+	while (cur != list_end(&ready_list))
+	{
+		MLFQS_SetPri(list_entry(cur, struct thread, elem));
+		cur = list_next(cur);
+	}
+	
 }

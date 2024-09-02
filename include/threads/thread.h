@@ -30,15 +30,22 @@ typedef int tid_t;
 
 
 // 소수 연산 매크로 생성
-#define F (1<<14)
-#define FLOAT(n) n*F
-#define INT(n) n/F
-#define ROUNDINT(x) (x+F/2)/ (x>=0 ? F : (x-F/2)/F)
-#define ADDFI(x, i) x+i*F
-#define MUL(x,y) ((int64_t) x) * y / F
-#define MULFI(x,n) x*n
-#define DIV(x,y) ((int64_t) x) * F / y
-#define DIVFI(x,n) x/n
+#define F (1 << 14)  // 고정 소수점 비율 정의
+
+#define FLOAT(n) ((n) * F)  // 정수를 고정 소수점으로 변환
+#define INT(n) ((n) / F)  // 고정 소수점을 정수로 변환
+
+#define ROUNDINT(x) (((x) >= 0) ? (((x) + F / 2) / F) : (((x) - F / 2) / F))  // 반올림하여 정수로 변환
+
+#define ADDFI(x, i) ((x) + (i) * F)  // 고정 소수점에 정수 추가
+#define SUBIF(i, f) ((i) * F - (f))  // 정수에서 고정 소수점 뺌
+
+#define MUL(x, y) (((int64_t) (x)) * (y) / F)  // 두 고정 소수점 수를 곱함
+#define MULFI(x, n) ((x) * (n))  // 고정 소수점을 정수와 곱함
+
+#define DIV(x, y) (((int64_t) (x)) * F / (y))  // 두 고정 소수점 수를 나눔
+#define DIVFI(x, n) ((x) / (n))  // 고정 소수점을 정수로 나눔
+
 
 
 /* A kernel thread or user process.
@@ -114,6 +121,7 @@ struct thread {
 	int recent_cpu;
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+	struct list_elem all_elem;          /* List element. */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -175,3 +183,9 @@ bool Donate_On_Set(int new_priority);
 static bool sleep_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 
 static bool priority_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+
+void Set_Load_Avg();
+
+void Fix_All_Recent_CPU();
+
+void MLFQS_SetPriorities();
