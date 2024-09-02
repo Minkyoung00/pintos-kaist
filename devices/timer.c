@@ -135,19 +135,22 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ASSERT (intr_get_level () == INTR_OFF);
 	ticks++; 
-	thread_tick ();
 
 	thread_wake (ticks);
-	thread_cpu (); 					
-
-	if (ticks % 4 == 0)				// 4 tick마다 모든 스레드의 priority recalculate
-		// recalculate_priority();
-
-	if (ticks % TIMER_FREQ == 0)
+	if (thread_mlfqs)
 	{
-		// recalculate_recent_cpu();
-		update_load_avg();
+		thread_cpu (); 					
+
+		if (ticks % TIMER_FREQ == 0)
+		{
+			update_load_avg();
+			recalculate_recent_cpu();
+		}
+		
+		if (ticks % 4 == 0)				// 4 tick마다 모든 스레드의 priority recalculate
+			recalculate_priority();
 	}
+	thread_tick ();
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

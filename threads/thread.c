@@ -264,7 +264,7 @@ thread_create (const char *name, int priority,
 
 	if (thread_current() != idle_thread)
 	{
-		list_push_back(&blocked_list, &thread_current()->blocked_elem);
+		list_push_back(&blocked_list, &t->blocked_elem);
 	}
 
 	/* Add to run queue. */
@@ -307,7 +307,15 @@ priority_more(const struct list_elem *a_, const struct list_elem *b_,
 	return a->priority > b->priority;
 
 }
+static bool
+priority_less(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED){
+	const struct thread *a = list_entry (a_, struct thread, elem);
+	const struct thread *b = list_entry (b_, struct thread, elem);
 
+	return a->priority < b->priority;
+
+}
 /* Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
@@ -328,7 +336,7 @@ thread_unblock (struct thread *t) {
 	// 방금 create된 스레드의 경우 ready_list에 들어오기 위해 thread_unblock 실행
 	// 이런 경우에 block_list에서 remove를 시도할 경우 error
 	// if (!list_empty(&blocked_list) && t->status == THREAD_BLOCKED && t != idle_thread)
-	if (!list_empty(&blocked_list) && t != idle_thread)
+	if ( t != idle_thread)
 		list_remove(&t->blocked_elem);
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -448,9 +456,10 @@ thread_set_nice (int nice UNUSED) {
 	struct thread *t = thread_current ();
 	t->nice = nice;
 
-	int new_priority = nice_to_priority(t, nice);
+	// int new_priority = nice_to_priority(t, nice);
+	// t->nice = new_priority ;
 
-	thread_set_priority(new_priority);
+	// thread_set_priority(new_priority);
 }
 
 /* Returns the current thread's nice value. */
@@ -480,7 +489,8 @@ recalculate_priority(void){
 	}
 
 	t = thread_current();
-	thread_set_nice(t->nice);
+	t->priority = nice_to_priority(t, t->nice);
+	// thread_set_nice(t->nice);
 }
 
 /* calculate the thread's priority according to the nice value */
