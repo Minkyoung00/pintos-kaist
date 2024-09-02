@@ -385,12 +385,16 @@ bool Donate_On_Set(int new_priority)
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) {
-	return thread_current ()->priority;
+	enum intr_level old_level = intr_disable ();
+	int temp = thread_current ()->priority;
+	intr_set_level (old_level);
+	return temp;
 }
 
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int nice UNUSED) {
+	enum intr_level old_level = intr_disable ();
 	struct thread* cur = thread_current(); 
 	cur->nice = nice;
 	//MLFQS_SetPri(thread_current());
@@ -398,25 +402,35 @@ thread_set_nice (int nice UNUSED) {
 	Thread_Preempt();
 	/* TODO: Your implementation goes here */
 	
+	intr_set_level (old_level);
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) {
+	enum intr_level old_level = intr_disable ();
 	/* TODO: Your implementation goes here */
-	return thread_current()->nice;
+	int temp = thread_current()->nice;
+	intr_set_level (old_level);
+	return temp;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) {
-	return ROUNDINT(load_avg*100);
+	enum intr_level old_level = intr_disable ();
+	int temp = ROUNDINT(load_avg*100);
+	intr_set_level (old_level);
+	return temp;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) {
-	return ROUNDINT(thread_current()->recent_cpu*100);
+	enum intr_level old_level = intr_disable ();
+	int temp = ROUNDINT(thread_current()->recent_cpu*100);
+	intr_set_level (old_level);
+	return temp;
 }
 
 
@@ -752,7 +766,7 @@ void MLFQS_SetPriorities()
 
 	while (cur != list_end(&all_list))
 	{
-		MLFQS_SetPri(list_entry(cur, struct thread, elem));
+		MLFQS_SetPri(list_entry(cur, struct thread, all_elem));
 		cur = list_next(cur);
 	}
 	
