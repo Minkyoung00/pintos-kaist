@@ -729,7 +729,7 @@ void Thread_Preempt()
 {
 	if(list_empty(&ready_list)) return;
 	struct thread* cur = thread_current();
-	if(cur == idle_thread) return;
+	//if(cur == idle_thread) return;
 	struct thread* front = list_entry(list_front(&ready_list), struct thread, elem);
 	
 	// 우선순위 이상 없음. 넘겨
