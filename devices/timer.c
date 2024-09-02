@@ -93,15 +93,6 @@ timer_elapsed (int64_t then) {
 	return timer_ticks () - then;
 }
 
-static bool
-wait_t_less(const struct list_elem *a_, const struct list_elem *b_,
-            void *aux UNUSED){
-	const struct wait_elem *a = list_entry (a_, struct wait_elem, elem);
-	const struct wait_elem *b = list_entry (b_, struct wait_elem, elem);
-
-	return a->wake_t < b->wake_t;
-}
-
 /* Suspends execution for approximately TICKS timer ticks. */
 void
 timer_sleep (int64_t ticks) {
@@ -147,6 +138,16 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	thread_tick ();
 
 	thread_wake (ticks);
+	thread_cpu (); 					
+
+	if (ticks % 4 == 0)				// 4 tick마다 모든 스레드의 priority recalculate
+		// recalculate_priority();
+
+	if (ticks % TIMER_FREQ == 0)
+	{
+		// recalculate_recent_cpu();
+		update_load_avg();
+	}
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
