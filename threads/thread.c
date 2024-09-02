@@ -161,9 +161,13 @@ thread_tick (void) {
 	/* Enforce preemption. */
 	if (++thread_ticks >= TIME_SLICE)
 		intr_yield_on_return ();
-	
-	if (thread_mlfqs)
-		t->recent_cpu = ADDFI(t->recent_cpu, 1);
+}
+
+void Thread_Add_Recent_Cpu(struct thread* t)
+{
+	if(t == idle_thread) return;
+
+	t->recent_cpu = ADDFI(t->recent_cpu, 1);
 }
 
 /* Prints thread statistics. */
@@ -203,7 +207,6 @@ thread_create (const char *name, int priority,
 
 	/* Initialize thread. */
 	init_thread (t, name, priority);
-	list_push_back(&all_list, &t->all_elem);
 	tid = t->tid = allocate_tid ();
 
 	/* Call the kernel_thread if it scheduled.
@@ -218,9 +221,11 @@ thread_create (const char *name, int priority,
 	t->tf.eflags = FLAG_IF;
 
 	t->recent_cpu = thread_current()->recent_cpu;
+	t->nice = thread_current()->nice;
 
 	/* Add to run queue. */
 	thread_unblock (t);
+	Thread_Preempt();
 
 	return tid;
 }
@@ -258,7 +263,7 @@ thread_unblock (struct thread *t) {
 	//list_push_back (&ready_list, &t->elem);
 	list_insert_ordered(&ready_list, &(t->elem), priority_less, NULL);
 	t->status = THREAD_READY;
-	Thread_Preempt();
+	//Thread_Preempt(); <<이거 여기서 하면 안댐
 	intr_set_level (old_level);
 }
 
@@ -316,6 +321,7 @@ thread_exit (void) {
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
 	intr_disable ();
+	list_remove(&thread_current()->all_elem);
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();
 }
@@ -385,8 +391,11 @@ thread_get_priority (void) {
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int nice UNUSED) {
-	thread_current()->nice = nice;
-	MLFQS_SetPri(thread_current());
+	struct thread* cur = thread_current(); 
+	cur->nice = nice;
+	//MLFQS_SetPri(thread_current());
+	MLFQS_SetPri(cur);
+	Thread_Preempt();
 	/* TODO: Your implementation goes here */
 	
 }
@@ -410,23 +419,6 @@ thread_get_recent_cpu (void) {
 	return ROUNDINT(thread_current()->recent_cpu*100);
 }
 
-void Fix_All_Recent_CPU()
-{
-	if(list_empty(&ready_list)) return;
-
-	struct list_elem* cur = list_front(&ready_list);
-
-	while (cur != list_end(&ready_list))
-	{
-		struct thread* curThread = list_entry(cur, struct thread, elem);
-		int recent_cpu = curThread->recent_cpu;
-		int nice = curThread->nice;
-
-		curThread->recent_cpu = ADDFI(MUL(DIV(MULFI(load_avg, 2), ADDFI(MULFI(load_avg, 2), 1)), recent_cpu), nice);
-		cur = list_next(cur);
-	}
-	
-}
 
 /* Idle thread.  Executes when no other thread is ready to run.
 
@@ -492,6 +484,9 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->magic = THREAD_MAGIC;
 
 	t->nice = 0;
+	t->recent_cpu = 0;
+
+	list_push_back(&all_list, &t->all_elem);
 	
 	list_init(&t->lock_list);
 }
@@ -676,10 +671,10 @@ allocate_tid (void) {
 
 void Thread_Sleep(int64_t wakeTime)
 {
+	enum intr_level old_level = intr_disable ();
+
 	struct thread* curThread = thread_current();
 	curThread->wakeTime = wakeTime;
-
-	enum intr_level old_level = intr_disable ();
 
 	// 잘자 쓰레드야
 	list_insert_ordered(&sleep_list, &(curThread->elem), sleep_less, NULL);
@@ -718,6 +713,7 @@ static bool sleep_less (const struct list_elem *a_,
 
 void Thread_Preempt()
 {
+	if(list_empty(&ready_list)) return;
 	struct thread* cur = thread_current();
 	if(cur == idle_thread) return;
 	struct thread* front = list_entry(list_front(&ready_list), struct thread, elem);
@@ -735,26 +731,46 @@ void Set_Load_Avg()
 	int ready_threads = list_size(&ready_list);
 	if(thread_current() != idle_thread) ready_threads++;
 
-	load_avg = MUL(DIV(FLOAT(59),FLOAT(60)), load_avg) + MULFI(DIV(FLOAT(1),FLOAT(60)), ready_threads);
-	msg("load_avg:%d || ready_threads:%d", thread_get_load_avg(), ready_threads);
+	load_avg = MUL(DIV(FLOAT(59),FLOAT(60)), load_avg) + (FLOAT(ready_threads)/60);
+	//msg("load_avg:%d || ready_threads:%d", thread_get_load_avg(), ready_threads);
 }
 
 void MLFQS_SetPri(struct thread* curThread)
-{                                                                                                          
+{                    
+	if(curThread == idle_thread) return;
+
 	int recent_cpu = curThread->recent_cpu;
 	int nice = curThread->nice;
 
-	curThread->priority = SUBIF((PRI_MAX - (nice * 2)), DIVFI(recent_cpu, 4));
+	curThread->priority = (PRI_MAX - ROUNDINT(DIVFI(recent_cpu, 4)) - (nice * 2));
 }
 void MLFQS_SetPriorities()
 {
-	if(list_empty(&ready_list)) return;
+	if(list_empty(&all_list)) return;
 
-	struct list_elem* cur = list_front(&ready_list);
+	struct list_elem* cur = list_front(&all_list);
 
-	while (cur != list_end(&ready_list))
+	while (cur != list_end(&all_list))
 	{
 		MLFQS_SetPri(list_entry(cur, struct thread, elem));
+		cur = list_next(cur);
+	}
+	
+	list_sort(&ready_list, priority_less, NULL);
+}
+void Fix_All_Recent_CPU()
+{
+	if(list_empty(&all_list)) return;
+
+	struct list_elem* cur = list_front(&all_list);
+
+	while (cur != list_end(&all_list))
+	{
+		struct thread* curThread = list_entry(cur, struct thread, all_elem);
+		int recent_cpu = curThread->recent_cpu;
+		int nice = curThread->nice;
+
+		curThread->recent_cpu = ADDFI(MUL(DIV(load_avg*2, ADDFI((load_avg*2), 1)), recent_cpu), nice);
 		cur = list_next(cur);
 	}
 	

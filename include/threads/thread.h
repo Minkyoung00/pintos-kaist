@@ -189,3 +189,5 @@ void Set_Load_Avg();
 void Fix_All_Recent_CPU();
 
 void MLFQS_SetPriorities();
+
+void Thread_Add_Recent_Cpu(struct thread* t);

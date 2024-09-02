@@ -141,6 +141,7 @@ sema_up (struct semaphore *sema) {
 		struct list_elem* mx = list_max(&sema->waiters, priority_greater, NULL);
 		list_remove(mx);
 		thread_unblock (list_entry (mx, struct thread, elem));
+		Thread_Preempt();
 	}
 	intr_set_level (old_level);
 }
