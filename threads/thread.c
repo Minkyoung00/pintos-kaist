@@ -27,11 +27,10 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+static struct list blocked_list;
 
 /* Project 1. Alarm Clock */
 static struct list ToWake_list;
-
-static struct list blocked_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -54,7 +53,7 @@ static long long user_ticks;    /* # of timer ticks in user programs. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 
-static int load_avg = 0;
+static int load_avg;
 #define f 16384
 
 /* If false (default), use round-robin scheduler.
@@ -307,15 +306,7 @@ priority_more(const struct list_elem *a_, const struct list_elem *b_,
 	return a->priority > b->priority;
 
 }
-static bool
-priority_less(const struct list_elem *a_, const struct list_elem *b_,
-            void *aux UNUSED){
-	const struct thread *a = list_entry (a_, struct thread, elem);
-	const struct thread *b = list_entry (b_, struct thread, elem);
 
-	return a->priority < b->priority;
-
-}
 /* Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
@@ -516,7 +507,6 @@ thread_get_load_avg (void) {
 	/* TODO: Your implementation goes here */
 
 	return (load_avg *100 + f/2) / f;
-	// return load_avg*100;
 }
 
 void
@@ -528,9 +518,9 @@ update_load_avg(void){
 	else 
 		ready_threads = list_size(&ready_list) + 1;
 
-	// load_avg = 59 * load_avg / 60  + ready_threads * f / 60 ;	
-	load_avg = ((int64_t)(((int64_t)(59 * f)) * f / (60 * f))) * load_avg / f  
-					+ ((int64_t)(1 * f))*f / (60 * f) * ready_threads;
+	load_avg = 59 * load_avg / 60  + ready_threads * f / 60 ;	
+	// load_avg = ((int64_t)(((int64_t)(59 * f)) * f / (60 * f))) * load_avg / f  
+	// 				+ ((int64_t)(1 * f))*f / (60 * f) * ready_threads;
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -562,17 +552,14 @@ recalculate_recent_cpu(void){
 	for (e =list_begin (&ready_list); e != list_end (&ready_list); e = list_next (e))
 	{
 		t = list_entry(e, struct thread, elem);
-
 		t->recent_cpu = (((int64_t)(((int64_t)(2 * load_avg)) * f /(2 * load_avg + 1 * f))) * t->recent_cpu / f) + (t->nice * f);
 	}
 
 	for (e = list_begin (&blocked_list); e != list_end (&blocked_list); e = list_next (e))
 	{
 		t = list_entry(e, struct thread, blocked_elem);
-		// msg("%d",list_entry(e, struct thread, blocked_elem)->priority);
 		t->recent_cpu = (((int64_t)(((int64_t)(2 * load_avg)) * f /(2 * load_avg + 1 * f))) * t->recent_cpu / f) + (t->nice * f);
 	}
-	// msg("%d",list_entry(list_prev(list_end (&blocked_list)), struct thread, blocked_elem)->priority);
 
 	t = thread_current();
 	t->recent_cpu = (((int64_t)(((int64_t)(2 * load_avg)) * f /(2 * load_avg + 1 * f))) * t->recent_cpu / f) + (t->nice * f);
