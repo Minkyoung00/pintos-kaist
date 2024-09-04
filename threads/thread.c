@@ -639,7 +639,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->waiting_lock = NULL;
 
 	/* initialize the new thread's nice value */
-	if (t = initial_thread)
+	if (t == initial_thread)
 	{
 		t->nice = 0;
 		t->recent_cpu = 0;
@@ -648,9 +648,12 @@ init_thread (struct thread *t, const char *name, int priority) {
 	{
 		t->nice = thread_current()->nice;
 		t->recent_cpu = thread_current()->recent_cpu;
-		t->priority = (PRI_MAX * f - (t->recent_cpu / 4) 
-							- (t->nice * 2) * f + f / 2) / f;
-		t->origin_priority = priority;
+		if (thread_mlfqs)
+		{
+			t->priority = (PRI_MAX * f - (t->recent_cpu / 4) 
+								- (t->nice * 2) * f + f / 2) / f;
+			t->origin_priority = priority;
+		}
 	}
 }
 
