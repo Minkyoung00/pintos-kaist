@@ -9,3 +9,5 @@
 *.dsk
 Makefile
 results
+
+userprog/build/

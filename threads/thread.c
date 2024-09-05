@@ -387,7 +387,12 @@ thread_preempt (void) {
 	struct thread *curr = thread_current ();
 
 	if (!list_empty(&ready_list) && list_entry(list_begin(&ready_list), struct thread, elem)->priority > curr->priority) {
-		thread_yield ();
+		if(intr_context()) {
+			intr_yield_on_return();
+		}
+		else {
+			thread_yield ();
+		}
 	}
 }
 
