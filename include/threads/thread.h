@@ -28,26 +28,6 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
-
-// 소수 연산 매크로 생성
-#define F (1 << 14)  // 고정 소수점 비율 정의
-
-#define FLOAT(n) ((n) * F)  // 정수를 고정 소수점으로 변환
-#define INT(n) ((n) / F)  // 고정 소수점을 정수로 변환
-
-#define ROUNDINT(x) (((x) >= 0) ? (((x) + F / 2) / F) : (((x) - F / 2) / F))  // 반올림하여 정수로 변환
-
-#define ADDFI(x, i) ((x) + (i) * F)  // 고정 소수점에 정수 추가
-#define SUBIF(i, f) ((i) * F - (f))  // 정수에서 고정 소수점 뺌
-
-#define MUL(x, y) (((int64_t) (x)) * (y) / F)  // 두 고정 소수점 수를 곱함
-#define MULFI(x, n) ((x) * (n))  // 고정 소수점을 정수와 곱함
-
-#define DIV(x, y) (((int64_t) (x)) * F / (y))  // 두 고정 소수점 수를 나눔
-#define DIVFI(x, n) ((x) / (n))  // 고정 소수점을 정수로 나눔
-
-
-
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -111,17 +91,15 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
-
-	int64_t wakeTime;
+	int64_t wakeup;
 	struct list lock_list;
-	
-	struct lock* waitLock;
-
+	struct lock *waiting_lock;
 	int nice;
 	int recent_cpu;
+
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
-	struct list_elem all_elem;          /* List element. */
+	struct list_elem allelem;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -153,6 +131,8 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
+void thread_sleep (int64_t);
+void thread_awake (int64_t);
 
 struct thread *thread_current (void);
 tid_t thread_tid (void);
@@ -164,30 +144,15 @@ void thread_yield (void);
 int thread_get_priority (void);
 void thread_set_priority (int);
 
+void calculate_priority (void);
+void calculate_tick_recent_cpu (struct thread *);
+void calculate_recent_cpu_load_avg (void);
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+static bool priority_ful (const struct list_elem *, const struct list_elem *, void *aux); 
 
 #endif /* threads/thread.h */
-
-void Thread_Sleep(int64_t wakeTime);
-void Thread_WakeUp();
-void Thread_Preempt();
-
-bool Donate_On_Set(int new_priority);
-
-
-static bool sleep_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
-
-static bool priority_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
-
-void Set_Load_Avg();
-
-void Fix_All_Recent_CPU();
-
-void MLFQS_SetPriorities();
-
-void Thread_Add_Recent_Cpu(struct thread* t);
