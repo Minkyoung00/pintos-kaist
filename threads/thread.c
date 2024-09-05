@@ -447,10 +447,9 @@ thread_set_nice (int nice UNUSED) {
 	struct thread *t = thread_current ();
 	t->nice = nice;
 
-	// int new_priority = nice_to_priority(t, nice);
-	// t->nice = new_priority ;
+	int new_priority = nice_to_priority(t, nice);
 
-	// thread_set_priority(new_priority);
+	thread_set_priority(new_priority);
 }
 
 /* Returns the current thread's nice value. */
