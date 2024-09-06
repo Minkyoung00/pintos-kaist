@@ -466,11 +466,10 @@ load (const char *file_name, struct intr_frame *if_) {
 	if_->R.rsi = if_->rsp;
 
 	// return address
-	len = sizeof(void(*)());
+	len = if_->rsp%8;
 	if_->rsp -= len;
 	memset(if_->rsp, 0, len);
 
-	if_->rsp = if_->rsp;
 
 	success = true;
 
