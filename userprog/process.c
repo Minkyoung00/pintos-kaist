@@ -204,6 +204,7 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	while(1){}
 	return -1;
 }
 
@@ -335,8 +336,24 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	process_activate (thread_current ());
 
+	char argument[LOADER_ARGS_LEN];
+	char *argv[LOADER_ARGS_LEN/2 + 1];
+	char *token, *save_ptr;
+	int argc = 0;
+
+	strlcpy(argument, file_name, LOADER_ARGS_LEN);  // argument에 문자열 한 자씩 담기
+
+	i = 0;
+	for (token = strtok_r (argument, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr))
+	{
+		argv[i] = token;
+		argc ++;
+		i ++;
+	}
+	argv[argc] = NULL;	 
+
 	/* Open executable file. */
-	file = filesys_open (file_name);
+	file = filesys_open (argv[0]);
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
@@ -416,6 +433,26 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+
+	for (i = argc-1; i >= 0; i--){
+		if_->rsp -= strlen(argv[i]) + 1;
+		strlcpy((char*)if_->rsp, argv[i], strlen(argv[i])+1);
+		argv[i] = (char*)if_->rsp;
+	}
+	
+	if_->rsp = ROUND_DOWN(if_->rsp, 8);
+
+	for (i = argc; i >= 0; i--){
+		if_->rsp -= sizeof(argv[i]);
+		*(uintptr_t*)if_->rsp = (uintptr_t)argv[i];
+	}
+	
+	if_->rsp -= sizeof(void*);
+
+	hex_dump(if_->rsp, if_->rsp, USER_STACK - if_->rsp, true);
+
+	if_->R.rsi = if_->rsp + 8;
+	if_->R.rdi = argc;
 
 	success = true;
 
