@@ -184,6 +184,8 @@ process_exec (void *f_name) {
 	if (!success)
 		return -1;
 
+	hex_dump(_if.rsp, _if.rsp, USER_STACK-_if.rsp, true);
+
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -204,6 +206,8 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+
+	while(1){}
 	return -1;
 }
 
@@ -335,10 +339,23 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	process_activate (thread_current ());
 
+	//=====================================================================================================================
+	char* argv[128];
+	char* argp[128];
+	int argc = 0, len = 0;
+	char *token, *save_ptr;
+
+	//														인자 쪼개기
+	for(token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
+	{
+		argv[argc++] = token;
+	}
+	//=====================================================================================================================
+
 	/* Open executable file. */
-	file = filesys_open (file_name);
+	file = filesys_open (argv[0]);
 	if (file == NULL) {
-		printf ("load: %s: open failed\n", file_name);
+		printf ("load: %s: open failed\n", argv[0]);
 		goto done;
 	}
 
@@ -350,7 +367,7 @@ load (const char *file_name, struct intr_frame *if_) {
 			|| ehdr.e_version != 1
 			|| ehdr.e_phentsize != sizeof (struct Phdr)
 			|| ehdr.e_phnum > 1024) {
-		printf ("load: %s: error loading executable\n", file_name);
+		printf ("load: %s: error loading executable\n", argv[0]);
 		goto done;
 	}
 
@@ -416,6 +433,44 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+
+	//스택 포인터 내리면서 인자 복사해줌
+	for(int i = argc-1; i >= 0; i--)
+	{
+		len = strlen(argv[i])+1;
+		if_->rsp -= len;
+		argp[i] = if_->rsp;
+
+		strlcpy(if_->rsp, argv[i], len);
+	}
+
+	// word-align
+	len = sizeof(uint8_t*);
+	if_->rsp -= len;
+
+	memset(if_->rsp, 0, len);
+
+	// argv[N]
+	len = sizeof(char*);
+	if_->rsp -= len;
+
+	memset(if_->rsp, 0, len);
+
+	for(int i = argc-1; i >= 0; i--)
+	{
+		if_->rsp -= len;
+
+		memcpy(if_->rsp, &argp[i], sizeof(char*));
+	}
+	if_->R.rdi = argc;
+	if_->R.rsi = if_->rsp;
+
+	// return address
+	len = sizeof(void(*)());
+	if_->rsp -= len;
+	memset(if_->rsp, 0, len);
+
+	if_->rsp = if_->rsp;
 
 	success = true;
 
