@@ -654,6 +654,16 @@ init_thread (struct thread *t, const char *name, int priority) {
 			t->origin_priority = priority;
 		}
 	}
+
+#ifdef USERPROG
+	/* Owned by userprog/process.c. */
+	memset(t->fd_table, 0, 64 * sizeof(void*));
+	t->fd_table[0] = (void*)1;
+	t->fd_table[1] = (void*)1;
+	t->fd_table[2] = (void*)1;
+	t->exit_code = 0;
+	t->is_user = false;
+#endif
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

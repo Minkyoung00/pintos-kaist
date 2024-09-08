@@ -147,7 +147,7 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 			recalculate_recent_cpu();
 		}
 		
-		if (ticks % 4 == 0)				// 4 tick마다 모든 스레드의 priority recalculate
+		if (ticks % 4 == 0)			
 			recalculate_priority();
 	}
 	thread_tick ();

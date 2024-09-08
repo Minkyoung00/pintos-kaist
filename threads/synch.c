@@ -78,7 +78,7 @@ sema_down (struct semaphore *sema) {
 
 	old_level = intr_disable ();
 	while (sema->value == 0)
-	{ // 잠김 상태면
+	{ 
 		// list_push_back(&sema->waiters, &thread_current ()->elem);
 		thread_current()->sema = sema;
 		list_insert_ordered (&sema->waiters, &thread_current ()->elem, priority_more, NULL);
@@ -135,9 +135,7 @@ sema_up (struct semaphore *sema) {
 		
 		sema->value++;
 
-		/////////////////////////////////////////////////////////////////////////////////
-	/* Project 1. Priority Schedulling */
-	/////////////////////////////////////////////////////////////////////////////////
+		/* Project 1. Priority Schedulling */
 		if((thread_get_priority() < front->priority)&& !intr_context())
 		{ 
 			thread_yield();
@@ -366,21 +364,6 @@ cond_init (struct condition *cond) {
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
-static bool
-sema_priority_less(const struct list_elem *a_, const struct list_elem *b_,
-            void *aux UNUSED){
-	struct semaphore_elem *a = list_entry (a_, struct semaphore_elem, elem);
-	struct semaphore_elem *b = list_entry (b_, struct semaphore_elem, elem);
-	
-	if (!list_empty (&a->semaphore.waiters))
-	{
-		struct thread *t_a = list_entry (list_begin(&a->semaphore.waiters), struct thread, elem); 
-		struct thread *t_b = list_entry (list_begin(&b->semaphore.waiters), struct thread, elem);
-		
-		return t_a->priority < t_b->priority;
-	}
-	return false;
-}
 
 void
 cond_wait (struct condition *cond, struct lock *lock) {
@@ -399,6 +382,21 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	lock_acquire (lock);
 }
 
+static bool
+sema_priority_less(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED){
+	struct semaphore_elem *a = list_entry (a_, struct semaphore_elem, elem);
+	struct semaphore_elem *b = list_entry (b_, struct semaphore_elem, elem);
+	
+	if (!list_empty (&a->semaphore.waiters))
+	{
+		struct thread *t_a = list_entry (list_begin(&a->semaphore.waiters), struct thread, elem); 
+		struct thread *t_b = list_entry (list_begin(&b->semaphore.waiters), struct thread, elem);
+		
+		return t_a->priority < t_b->priority;
+	}
+	return false;
+}
 /* If any threads are waiting on COND (protected by LOCK), then
    this function signals one of them to wake up from its wait.
    LOCK must be held before calling this function.
@@ -417,7 +415,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 	{
 		struct semaphore_elem *max_sema = list_entry (list_max (&cond->waiters, sema_priority_less, NULL),
 											struct semaphore_elem, elem);
-		list_remove(max_sema);
+		list_remove(&max_sema->elem);
 		sema_up (&max_sema->semaphore);
 	}
 }

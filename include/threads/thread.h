@@ -108,6 +108,9 @@ struct thread {
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
+	void *fd_table[64];
+	int exit_code;
+	bool is_user;
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
@@ -119,7 +122,7 @@ struct thread {
 	unsigned magic;                     /* Detects stack overflow. */
 };
 
-static struct sleep_elem{
+struct sleep_elem{
     struct list_elem elem;
     struct semaphore *sema;
     int64_t wake_t;
@@ -168,5 +171,9 @@ void thread_sleep (int64_t start, int64_t ticks);
 void thread_wake (int64_t ticks);
 void update_list(struct list* list, struct thread *t);
 int nice_to_priority(struct thread *t, int nice);
+void recalculate_priority(void);
+void update_load_avg(void);
+void thread_cpu (void);
+void recalculate_recent_cpu(void);
 
 #endif /* threads/thread.h */

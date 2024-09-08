@@ -1,0 +1,42 @@
+Kernel command line: -q -f put exec-boundary put child-simple run exec-boundary
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Calibrating timer...  58,880,000 loops/s.
+hd0:0: detected 321 sector (160 kB) disk, model "QEMU HARDDISK", serial "QM00001"
+hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
+hd1:0: detected 207 sector (103 kB) disk, model "QEMU HARDDISK", serial "QM00003"
+Formatting file system...done.
+Boot complete.
+Putting 'exec-boundary' into the file system...
+Putting 'child-simple' into the file system...
+Executing 'exec-boundary':
+(exec-boundary) begin
+(exec-boundary) fork
+(exec-boundary) wait
+(exec-boundary) wait: FAILED
+exec-boundary: exit(1)
+Interrupt 0x0d (#GP General Protection Exception) at rip=800421bd86
+ cr2=0000000000000000 error=               0
+rax 000000800423fee7 rbx 0000000000000000 rcx 00000000000000c0 rdx cccccccccccccccc
+rsp 000000800423fed0 rbp 000000800423ffc0 rsi 0000008004240e60 rdi 0000008004240e60
+rip 000000800421bd86 r8 0000000000000000  r9 0000000000000000 r10 0000000000000000
+r11 0000000000000000 r12 0000000000000000 r13 0000000000000000 r14 0000000000000000
+r15 0000000000000000 rflags 00000246
+es: 0010 ds: 0010 cs: 0008 ss: 0010
+Kernel PANIC at ../../userprog/exception.c:97 in kill(): Kernel bug - unexpected interrupt in kernel
+Call stack: 0x800421859a 0x800421cec0 0x8004209370 0x800420978e 0x8004207ca3.
+The `backtrace' program can make call stacks useful.
+Read "Backtraces" in the "Debugging Tools" chapter
+of the Pintos documentation for more information.
+Timer: 262 ticks
+Thread: 34 idle ticks, 228 kernel ticks, 1 user ticks
+hd0:0: 0 reads, 0 writes
+hd0:1: 107 reads, 452 writes
+hd1:0: 207 reads, 0 writes
+Console: 1805 characters output
+Keyboard: 0 keys pressed
+Exception: 0 page faults
+Powering off...

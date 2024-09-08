@@ -1,0 +1,46 @@
+Kernel command line: -q -f put sm-seq-random run sm-seq-random
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Calibrating timer...  65,433,600 loops/s.
+hd0:0: detected 321 sector (160 kB) disk, model "QEMU HARDDISK", serial "QM00001"
+hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
+hd1:0: detected 107 sector (53 kB) disk, model "QEMU HARDDISK", serial "QM00003"
+Formatting file system...done.
+Boot complete.
+Putting 'sm-seq-random' into the file system...
+Executing 'sm-seq-random':
+(sm-seq-random) begin
+(sm-seq-random) create "nibble"
+(sm-seq-random) open "nibble"
+(sm-seq-random) writing "nibble"
+(sm-seq-random) close "nibble"
+(sm-seq-random) open "nibble" for verification
+(sm-seq-random) 293 bytes read starting at offset 219 in "nibble" differ from expected.
+(sm-seq-random) Showing first differing 64 bytes.
+(sm-seq-random) Data actually read:
+00000000000000d0                                   cc cc cc cc cc |           .....|
+00000000000000e0  cc cc cc cc cc cc cc cc-cc cc cc cc cc cc cc cc |................|
+00000000000000f0  cc cc cc cc cc cc cc cc-cc cc cc cc cc cc cc cc |................|
+0000000000000100  cc cc cc cc cc cc cc cc-cc cc cc cc cc cc cc cc |................|
+0000000000000110  cc cc cc cc cc cc cc cc-cc cc cc                |...........     |
+(sm-seq-random) Expected data:
+00000000000000d0                                   d5 f5 02 06 4a |           ....J|
+00000000000000e0  fb 96 77 8e a7 48 b4 e2-1f 1d 68 f5 2e 76 4f c9 |..w..H....h..vO.|
+00000000000000f0  3b 79 a0 50 02 e2 b6 ca-59 e3 4b fb 55 75 38 62 |;y.P....Y.K.Uu8b|
+0000000000000100  44 42 a6 78 05 99 e5 5a-4b c7 de be 1f 65 2f b7 |DB.x...ZK....e/.|
+0000000000000110  78 b7 a0 3a 49 15 2a eb-66 bd 04                |x..:I.*.f..     |
+(sm-seq-random) 293 bytes read starting at offset 219 in "nibble" differ from expected: FAILED
+sm-seq-random: exit(1)
+Execution of 'sm-seq-random' complete.
+Timer: 1367 ticks
+Thread: 36 idle ticks, 1326 kernel ticks, 5 user ticks
+hd0:0: 0 reads, 0 writes
+hd0:1: 129 reads, 287 writes
+hd1:0: 107 reads, 0 writes
+Console: 2179 characters output
+Keyboard: 0 keys pressed
+Exception: 0 page faults
+Powering off...

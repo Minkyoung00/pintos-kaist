@@ -49,6 +49,9 @@ process_create_initd (const char *file_name) {
 	if (fn_copy == NULL)
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
+	
+	char *save_ptr;
+	file_name = strtok_r (file_name, " ", &save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
@@ -71,13 +74,22 @@ initd (void *f_name) {
 	NOT_REACHED ();
 }
 
+struct fork_args {
+	struct intr_frame *if_;
+	struct thread *thread;
+};
+
 /* Clones the current process as `name`. Returns the new process's thread id, or
  * TID_ERROR if the thread cannot be created. */
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+	struct fork_args aux;
+	aux.thread = thread_current ();
+	aux.if_ = if_;
+ 	
+	return thread_create (name, 
+			PRI_DEFAULT, __do_fork, &aux);
 }
 
 #ifndef VM
@@ -119,10 +131,11 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 static void
 __do_fork (void *aux) {
 	struct intr_frame if_;
-	struct thread *parent = (struct thread *) aux;
+	// struct thread *parent = (struct thread *) aux;
+	struct thread *parent = ((struct fork_args *)aux)->thread;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	struct intr_frame *parent_if =  ((struct fork_args *)aux)->if_;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
@@ -150,6 +163,7 @@ __do_fork (void *aux) {
 	 * TODO:       the resources of parent.*/
 
 	process_init ();
+	memcpy(current->fd_table, parent->fd_table, 64 * sizeof(void*));
 
 	/* Finally, switch to the newly created process. */
 	if (succ)
@@ -204,7 +218,11 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	while(1){}
+	int i = 0;
+	while(i < (1<<30)) i++;
+	i = 0;
+	while(i < (1<<30)) i++;
+	
 	return -1;
 }
 
@@ -216,6 +234,8 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
+	if (curr->is_user)
+		printf ("%s: exit(%d)\n", curr->name, curr->exit_code);
 
 	process_cleanup ();
 }
@@ -449,7 +469,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	
 	if_->rsp -= sizeof(void*);
 
-	hex_dump(if_->rsp, if_->rsp, USER_STACK - if_->rsp, true);
+	// hex_dump(if_->rsp, if_->rsp, USER_STACK - if_->rsp, true);
 
 	if_->R.rsi = if_->rsp + 8;
 	if_->R.rdi = argc;
