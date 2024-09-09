@@ -44,15 +44,8 @@ process_create_initd (const char *file_name) {
 	tid_t tid;
 
 
-	char* argv[64];
-	int argc = 0;
 	char *token, *save_ptr;
 
-	// 인자 쪼개기
-	for(token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
-	{
-		argv[argc++] = token;
-	}
 
 
 	/* Make a copy of FILE_NAME.
@@ -62,8 +55,11 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	// 인자 쪼개기
+	token = strtok_r(file_name, " ", &save_ptr);
+
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (argv[0], PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create (token, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 	return tid;
