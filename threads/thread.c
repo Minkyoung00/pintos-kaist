@@ -593,6 +593,26 @@ init_thread (struct thread *t, const char *name, int priority) {
 	}
 	list_push_back(&all_list, &t->allelem);
 	list_init (&t->lock_list);
+	
+	// project2 added.
+	// list_init (&t->children_list);
+
+	// // 표준 입출력 fd 등록
+	// t->fds[0] = STDIN_FILENO;
+	// t->fds[1] = STDOUT_FILENO;
+	// // fd2 : STDERR_FILENO 이지만 구현은 안되어있음.
+	// t->fds[2] = NULL;
+	// for(int i = 3; i < FDMAXCOUNT; i++)
+	// {
+	// 	t->fds[i] = NULL;
+	// }
+	
+#ifdef USERPROG
+	t->thread_exit_status = 0;
+	t->is_user = false;
+#endif
+
+
 	t->waiting_lock = NULL;
 	t->magic = THREAD_MAGIC;
 }
@@ -773,4 +793,35 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+}
+
+struct thread* thread_get_child(tid_t tid)
+{
+	struct thread* curThread = thread_current();
+	struct list_elem* cur = list_front(&curThread->children_list);
+	struct thread* childThread = NULL;
+	
+	while (cur != list_end(&curThread->children_list))
+	{
+		childThread = list_entry(cur, struct thread, childelem);
+		if(childThread->tid == tid)
+		{
+			return childThread;
+		}
+	}
+
+	return NULL;
+}
+
+bool thread_check_destroy(tid_t tid)
+{
+	struct list_elem* cur = list_begin(&destruction_req);
+
+	while (cur != list_end(&destruction_req))
+	{
+		if(list_entry(cur, struct thread, elem)->tid == tid)	return true;
+		cur = list_next(cur);
+	}
+
+	return false;
 }

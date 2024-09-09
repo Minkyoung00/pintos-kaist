@@ -43,6 +43,18 @@ process_create_initd (const char *file_name) {
 	char *fn_copy;
 	tid_t tid;
 
+
+	char* argv[64];
+	int argc = 0;
+	char *token, *save_ptr;
+
+	// 인자 쪼개기
+	for(token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
+	{
+		argv[argc++] = token;
+	}
+
+
 	/* Make a copy of FILE_NAME.
 	 * Otherwise there's a race between the caller and load(). */
 	fn_copy = palloc_get_page (0);
@@ -51,7 +63,7 @@ process_create_initd (const char *file_name) {
 	strlcpy (fn_copy, file_name, PGSIZE);
 
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create (argv[0], PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 	return tid;
@@ -149,6 +161,8 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 
+	//file_duplicate();
+ 	// list_push_back(&parent->children_list, &current->childelem);
 	process_init ();
 
 	/* Finally, switch to the newly created process. */
@@ -184,7 +198,7 @@ process_exec (void *f_name) {
 	if (!success)
 		return -1;
 
-	hex_dump(_if.rsp, _if.rsp, USER_STACK-_if.rsp, true);
+	//hex_dump(_if.rsp, _if.rsp, USER_STACK-_if.rsp, true);
 
 	/* Start switched process. */
 	do_iret (&_if);
@@ -206,20 +220,23 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-
-	while(1){}
+	int i = 0;
+	while (i < 1<<30) {i++;}
+	// while(1){}
 	return -1;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
 void
 process_exit (void) {
-	struct thread *curr = thread_current ();
+	// struct thread *curr = thread_current ();
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-
+	struct thread *cur = thread_current(); 
+	if (cur->is_user)
+		printf("%s: exit(%d)\n", cur->name, cur->thread_exit_status);
 	process_cleanup ();
 }
 
@@ -340,12 +357,11 @@ load (const char *file_name, struct intr_frame *if_) {
 	process_activate (thread_current ());
 
 	//=====================================================================================================================
-	char* argv[128];
-	char* argp[128];
+	char* argv[64];
 	int argc = 0, len = 0;
 	char *token, *save_ptr;
 
-	//														인자 쪼개기
+	// 인자 쪼개기
 	for(token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
 	{
 		argv[argc++] = token;
@@ -433,6 +449,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+	char* argp[64];
 
 	//스택 포인터 내리면서 인자 복사해줌
 	for(int i = argc-1; i >= 0; i--)
@@ -445,7 +462,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	}
 
 	// word-align
-	len = sizeof(uint8_t*);
+	len = if_->rsp % 8;
 	if_->rsp -= len;
 
 	memset(if_->rsp, 0, len);
@@ -466,7 +483,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	if_->R.rsi = if_->rsp;
 
 	// return address
-	len = if_->rsp%8;
+	len = sizeof(void*);
 	if_->rsp -= len;
 	memset(if_->rsp, 0, len);
 
