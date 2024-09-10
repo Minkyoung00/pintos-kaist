@@ -7,6 +7,8 @@
         "filesys.h": "c",
         "file.h": "c",
         "malloc.h": "c",
-        "thread.h": "c"
+        "thread.h": "c",
+        "process.h": "c",
+        "loader.h": "c"
     }
 }

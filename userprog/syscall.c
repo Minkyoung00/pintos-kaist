@@ -18,15 +18,19 @@ typedef int pid_t;
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
+bool CheckFileDir(const char *, uint64_t *);
 
 void halt (void);
 void exit (int status);
+int wait (pid_t pid);
 pid_t fork (const char *thread_name);
 int exec (const char *cmd_line);
 int write (int fd, const void *buffer, unsigned size);
+int read (int fd, void *buffer, unsigned size);
 bool create (const char *file, unsigned initial_size);
 bool remove (const char *file);
 int open (const char *file);
+int filesize (int fd);
 void close (int fd);
 
 /* System call.
@@ -91,9 +95,9 @@ syscall_handler (struct intr_frame *f) {
 		f->R.rax = filesize(f->R.rdi);
 		break;
 
-	// case SYS_READ://9
-	// 	f->R.rax = file_read(f->R.rdi, f->R.rsi, f->R.rdx);
-	//  	break;
+	case SYS_READ://9
+		f->R.rax = file_read(f->R.rdi, f->R.rsi, f->R.rdx);
+	 	break;
 
 	case SYS_WRITE:	//10
 		write(f->R.rdi, f->R.rsi, f->R.rdx);
@@ -125,6 +129,13 @@ pid_t fork (const char *thread_name)
 	return process_fork(thread_name, NULL);
 }
 
+int read (int fd, void *buffer, unsigned size)
+{
+	struct file* file = thread_current()->fds[fd];
+	if(!file) return -1;
+	return file_read(file, buffer, size);
+}
+
 int write (int fd, const void *buffer, unsigned size)
 {
 	const char* s = (const char*) buffer;
@@ -134,9 +145,10 @@ int write (int fd, const void *buffer, unsigned size)
 		return strlen(s);
 	}
 
-	printf("fd:%d is not supported.", fd);
-	halt();
-	return size;
+	struct file * curFile = thread_current()->fds[fd];
+	off_t retSize = file_write(curFile, buffer, size);
+
+	return retSize;
 }
 
 int exec (const char *cmd_line)
@@ -145,6 +157,10 @@ int exec (const char *cmd_line)
 }
 
 
+bool CheckFileDir(const char *file, uint64_t *pml4)
+{
+	return (!file || is_kernel_vaddr(file) || pml4_get_page(pml4, file) == NULL);
+}
 
 #pragma region Finished
 void halt (void)
@@ -154,12 +170,13 @@ void halt (void)
 
 bool create (const char *file, unsigned initial_size)
 {
-	if(!file || is_kernel_vaddr(file) || pml4_get_page(thread_current()->pml4, file) == NULL) exit(-1);
+	if(CheckFileDir(file, thread_current()->pml4)) exit(-1);
 	return filesys_create(file, initial_size);
 }
 
 bool remove (const char *file)
 {
+	if(CheckFileDir(file, thread_current()->pml4)) exit(-1);
 	return filesys_remove(file);
 }
 
@@ -172,7 +189,7 @@ int open (const char *file)
 {
 	struct thread* cur = thread_current();
 
-	if(!file || is_kernel_vaddr(file) || pml4_get_page(cur->pml4, file) == NULL)	exit(-1);
+	if(CheckFileDir(file, cur->pml4))	exit(-1);
 	struct file *retFile = filesys_open(file);
 	if(!retFile) return -1;
 
