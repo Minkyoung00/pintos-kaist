@@ -4,6 +4,9 @@
         "*.inc": "c",
         "syscall.h": "c",
         "init.h": "c",
-        "filesys.h": "c"
+        "filesys.h": "c",
+        "file.h": "c",
+        "malloc.h": "c",
+        "thread.h": "c"
     }
 }

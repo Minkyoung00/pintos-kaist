@@ -11,6 +11,7 @@
 #include <string.h>
 #include "userprog/process.h"
 #include "filesys/filesys.h"
+#include "filesys/file.h"
 
 /* Process identifier. */
 typedef int pid_t;
@@ -74,18 +75,25 @@ syscall_handler (struct intr_frame *f) {
 	// case SYS_EXEC:	//3
 	// 	exec(f->R.rdi);
 	// 	break;
-	// case SYS_WAIT:	//4
-	// 	wait(f->R.rdi);
-	// 	break;
-	// case SYS_CREATE://5
-	// 	create(f->R.rdi, f->R.rsi);
-	// 	break;
+	case SYS_WAIT:	//4
+		f->R.rax = wait(f->R.rdi);
+		break;
+	case SYS_CREATE://5
+		f->R.rax = create(f->R.rdi, f->R.rsi);
+		break;
 	// case SYS_REMOVE://6
 	// 	remove(f->R.rdi);
 	// 	break;
-	// case SYS_OPEN:
-		
-	// 	break;
+	case SYS_OPEN:
+		f->R.rax = open(f->R.rdi);
+		break;
+	case SYS_FILESIZE://8
+		f->R.rax = filesize(f->R.rdi);
+		break;
+
+	// case SYS_READ://9
+	// 	f->R.rax = file_read(f->R.rdi, f->R.rsi, f->R.rdx);
+	//  	break;
 
 	case SYS_WRITE:	//10
 		write(f->R.rdi, f->R.rsi, f->R.rdx);
@@ -109,21 +117,7 @@ void exit (int status)
 
 int wait (pid_t pid)
 {
-	struct thread* childThread = thread_get_child(pid);
-
-	// 자식 쓰레드 리스트에 해당 pid 가 없을 경우
-	if(!childThread)
-	{
-		return -1;
-	}
-
-	// 해당 쓰레드 끝날 때까지 무한 대기
-	while (!thread_check_destroy(pid))
-	{
-		
-	}
-
-	return childThread->thread_exit_status;
+	return process_wait(pid);
 }
 
 pid_t fork (const char *thread_name)
@@ -160,6 +154,7 @@ void halt (void)
 
 bool create (const char *file, unsigned initial_size)
 {
+	if(!file || is_kernel_vaddr(file) || pml4_get_page(thread_current()->pml4, file) == NULL) exit(-1);
 	return filesys_create(file, initial_size);
 }
 
@@ -177,11 +172,15 @@ int open (const char *file)
 {
 	struct thread* cur = thread_current();
 
+	if(!file || is_kernel_vaddr(file) || pml4_get_page(cur->pml4, file) == NULL)	exit(-1);
+	struct file *retFile = filesys_open(file);
+	if(!retFile) return -1;
+
 	for(int i = 3; i < FDMAXCOUNT; i++)
 	{
 		if(cur->fds[i] == NULL)
 		{
-			cur->fds[i] = filesys_open(file);
+			cur->fds[i] = retFile;
 			return i;
 		}
 	}

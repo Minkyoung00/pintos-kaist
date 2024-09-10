@@ -220,6 +220,25 @@ thread_create (const char *name, int priority,
 	init_thread (t, name, priority);
 	tid = t->tid = allocate_tid ();
 
+	#ifdef USERPROG
+	//부모자식 관계 세팅
+	struct thread* parent = thread_current();
+	t->parent = parent;
+
+	if(parent != idle_thread && name != "idle")
+	{
+		for(int i = 0; i < FDMAXCOUNT; i++)
+		{
+			if(parent->childTids[i] == -1)
+			{
+				//printf("[%s]=>[%s] PARENTSET %d\n", t->name, parent->name, tid);
+				parent->childTids[i] = tid;
+				break;
+			}
+		}
+	}
+	#endif
+
 	/* Call the kernel_thread if it scheduled.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
 	t->tf.rip = (uintptr_t) kernel_thread;
@@ -361,7 +380,23 @@ thread_exit (void) {
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
 	intr_disable ();
-	list_remove(&thread_current ()->allelem);
+
+	#ifdef USERPROG
+	struct thread* cur = thread_current();
+	struct thread* parent = cur->parent;
+	if(parent != NULL && cur != idle_thread && parent != idle_thread)	
+	{
+		for(int i = 0; i < FDMAXCOUNT; i++)
+		{
+			if(parent->childTids[i] == cur->tid)
+			{
+				parent->childTids[i] = -1;
+				break;
+			}
+		}
+	}
+	#endif
+
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();
 }
@@ -595,8 +630,14 @@ init_thread (struct thread *t, const char *name, int priority) {
 	list_init (&t->lock_list);
 	
 	// project2 added.
-	// list_init (&t->children_list);
-
+#ifdef USERPROG
+	t->parent = NULL;
+	t->waitingThread = -1;
+	for(int i = 0; i < FDMAXCOUNT; i++)
+	{
+		//printf("[%s]child 배열 초기화...\n", t->name);
+		t->childTids[i] = -1;
+	}
 	// // 표준 입출력 fd 등록
 	// t->fds[0] = STDIN_FILENO;
 	// t->fds[1] = STDOUT_FILENO;
@@ -606,8 +647,6 @@ init_thread (struct thread *t, const char *name, int priority) {
 	// {
 	// 	t->fds[i] = NULL;
 	// }
-	
-#ifdef USERPROG
 	t->thread_exit_status = 0;
 	t->is_user = false;
 #endif
@@ -738,6 +777,7 @@ do_schedule(int status) {
 	while (!list_empty (&destruction_req)) {
 		struct thread *victim =
 			list_entry (list_pop_front (&destruction_req), struct thread, elem);
+		list_remove(&victim->allelem);
 		palloc_free_page(victim);
 	}
 	thread_current ()->status = status;
@@ -795,22 +835,18 @@ allocate_tid (void) {
 	return tid;
 }
 
-struct thread* thread_get_child(tid_t tid)
+bool thread_has_child(tid_t tid)
 {
 	struct thread* curThread = thread_current();
-	struct list_elem* cur = list_front(&curThread->children_list);
-	struct thread* childThread = NULL;
 	
-	while (cur != list_end(&curThread->children_list))
+	for(int i = 0; i < FDMAXCOUNT; i++)
 	{
-		childThread = list_entry(cur, struct thread, childelem);
-		if(childThread->tid == tid)
-		{
-			return childThread;
-		}
+		//printf("[%s] thread_has_child[i]:%d,  %d:%d\n", curThread->name, i, curThread->childTids[i],tid);
+		if(curThread->childTids[i] == tid)
+			return true;
 	}
 
-	return NULL;
+	return false;
 }
 
 bool thread_check_destroy(tid_t tid)
@@ -824,4 +860,24 @@ bool thread_check_destroy(tid_t tid)
 	}
 
 	return false;
+}
+
+
+struct thread* get_thread_by_tid(tid_t tid)
+{
+	struct list_elem* cur = list_begin(&all_list);
+	//printf("get_thread_by_tid\n");
+	while (cur != list_end(&all_list))
+	{
+		struct thread* curThread = list_entry(cur, struct thread, allelem);
+		//printf("Looking for Thread.. %d:%d\n", curThread->tid, tid);
+		if(curThread->tid == tid)
+		{
+			//printf("Thread Found! %d\n", curThread->tid);
+			return curThread;
+		}	
+		cur = list_next(cur);
+	}
+
+	return NULL;
 }

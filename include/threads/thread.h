@@ -28,6 +28,9 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+#define FDMAXCOUNT 16
+#define USERPROG
+
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -85,8 +88,6 @@ typedef int tid_t;
  * only because they are mutually exclusive: only a thread in the
  * ready state is on the run queue, whereas only a thread in the
  * blocked state is on a semaphore wait list. */
-#define FDMAXCOUNT 32
-
 struct thread {
 	/* Owned by thread.c. */
 	tid_t tid;                          /* Thread identifier. */
@@ -102,13 +103,15 @@ struct thread {
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 	struct list_elem allelem;
+
+	int childTids[FDMAXCOUNT];
+	struct thread* parent;
+	tid_t waitingThread;
 	
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
 	struct file* fds[FDMAXCOUNT];
-	struct list children_list;
-	struct list_elem childelem;
 	int thread_exit_status;
 	bool is_user;
 #endif
@@ -165,5 +168,6 @@ static bool priority_ful (const struct list_elem *, const struct list_elem *, vo
 #endif /* threads/thread.h */
 
 
-struct thread* thread_get_child(tid_t tid);
+bool thread_has_child(tid_t tid);
 bool thread_check_destroy(tid_t tid);
+struct thread* get_thread_by_tid(tid_t tid);

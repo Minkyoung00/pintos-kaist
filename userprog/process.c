@@ -58,6 +58,7 @@ process_create_initd (const char *file_name) {
 	// 인자 쪼개기
 	token = strtok_r(file_name, " ", &save_ptr);
 
+	//printf("[%s] process_create_initd\n", token);
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (token, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
@@ -212,14 +213,27 @@ process_exec (void *f_name) {
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) {
-	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
-	 * XXX:       to add infinite loop here before
-	 * XXX:       implementing the process_wait. */
-	int i = 0;
-	while (i < 1<<30) {i++;}
-	// while(1){}
-	return -1;
+process_wait (tid_t child_tid) {
+	//printf("Process_Wait!!\n");
+	if(!thread_has_child(child_tid)) return -1;
+	// unsigned long long i = 0;
+	// while (i < (unsigned long long)1<<32)
+	// {
+	// 	i++;
+	// }
+	// return 0;
+	
+
+	thread_current()->waitingThread = child_tid;
+	// 해당 쓰레드 끝날 때까지 무한 대기
+	enum intr_level old_level = intr_disable();
+	thread_block();
+	
+	intr_set_level(old_level);
+	thread_current()->waitingThread = -1;
+	
+	//printf("Process_exit 4444\n");
+	return get_thread_by_tid(child_tid)->thread_exit_status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -233,7 +247,15 @@ process_exit (void) {
 	struct thread *cur = thread_current(); 
 	if (cur->is_user)
 		printf("%s: exit(%d)\n", cur->name, cur->thread_exit_status);
+
 	process_cleanup ();
+	
+		
+	struct thread* parent = cur->parent;
+	if(parent != NULL && parent->waitingThread == cur->tid)
+	{
+		thread_unblock(parent);
+	}
 }
 
 /* Free the current process's resources. */
