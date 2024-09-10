@@ -131,7 +131,7 @@ __do_fork (void *aux) {
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	struct intr_frame *parent_if = &parent->tf;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
@@ -158,8 +158,18 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 
-	//file_duplicate();
- 	// list_push_back(&parent->children_list, &current->childelem);
+	for(int i = 0; i < FDMAXCOUNT; i++)
+	{
+		if(parent->fds[i])
+		{
+			current->fds[i] = file_duplicate(parent->fds[i]);
+		}
+		else
+		{
+			current->fds[i] = NULL;
+		}
+
+	}
 	process_init ();
 
 	/* Finally, switch to the newly created process. */

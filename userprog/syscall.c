@@ -73,9 +73,9 @@ syscall_handler (struct intr_frame *f) {
 	case SYS_EXIT:	//1
 		exit(f->R.rdi);
 		break;
-	// case SYS_FORK:	//2
-	// 	fork(f->R.rdi);
-	// 	break;
+	case SYS_FORK:	//2
+		fork(f->R.rdi);
+		break;
 	// case SYS_EXEC:	//3
 	// 	exec(f->R.rdi);
 	// 	break;
@@ -88,7 +88,7 @@ syscall_handler (struct intr_frame *f) {
 	// case SYS_REMOVE://6
 	// 	remove(f->R.rdi);
 	// 	break;
-	case SYS_OPEN:
+	case SYS_OPEN:	//7
 		f->R.rax = open(f->R.rdi);
 		break;
 	case SYS_FILESIZE://8
@@ -96,11 +96,14 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_READ://9
-		f->R.rax = file_read(f->R.rdi, f->R.rsi, f->R.rdx);
+		f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
 	 	break;
 
 	case SYS_WRITE:	//10
-		write(f->R.rdi, f->R.rsi, f->R.rdx);
+		f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
+		break;
+	case SYS_CLOSE: //13
+		close(f->R.rdi);
 		break;
 
 	
@@ -131,23 +134,34 @@ pid_t fork (const char *thread_name)
 
 int read (int fd, void *buffer, unsigned size)
 {
+	if(fd < 2 || fd >= FDMAXCOUNT) return -1;
 	struct file* file = thread_current()->fds[fd];
 	if(!file) return -1;
+
+	//if(is_user_vaddr(buffer)) return -1;
+	if(CheckFileDir(buffer, thread_current()->pml4)) exit(-1);
+
+
 	return file_read(file, buffer, size);
 }
 
 int write (int fd, const void *buffer, unsigned size)
 {
-	const char* s = (const char*) buffer;
 	if(fd == 1)
 	{
+		const char* s = (const char*) buffer;
 		printf("%s", s);
 		return strlen(s);
 	}
+	
+	if(fd < 2 || fd >= FDMAXCOUNT) exit(-1);
+	if(CheckFileDir(buffer, thread_current()->pml4)) exit(-1);
 
 	struct file * curFile = thread_current()->fds[fd];
-	off_t retSize = file_write(curFile, buffer, size);
+	if(!curFile) exit(-1);
 
+	off_t retSize = file_write(curFile, buffer, size);
+	//printf("%d\n", retSize);
 	return retSize;
 }
 
@@ -182,17 +196,21 @@ bool remove (const char *file)
 
 int filesize (int fd)
 {
-	return sizeof(thread_current()->fds[fd]);
+	return file_length(thread_current()->fds[fd]);
 }
 
 int open (const char *file)
 {
 	struct thread* cur = thread_current();
-
+	//printf("11111\n");
 	if(CheckFileDir(file, cur->pml4))	exit(-1);
+	//printf("22222\n");
 	struct file *retFile = filesys_open(file);
+	//printf("33333\n");
+	//printf("FILE : %p\n", retFile);
 	if(!retFile) return -1;
-
+	//printf("44444\n");
+	
 	for(int i = 3; i < FDMAXCOUNT; i++)
 	{
 		if(cur->fds[i] == NULL)
@@ -207,8 +225,10 @@ int open (const char *file)
 
 void close (int fd)
 {
+	if(fd < 2 || fd >= FDMAXCOUNT) return;
 	struct thread* cur = thread_current();
 
+	file_close(cur->fds[fd]);
 	cur->fds[fd] = NULL;
 }
 #pragma endregion

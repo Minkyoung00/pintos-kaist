@@ -639,14 +639,16 @@ init_thread (struct thread *t, const char *name, int priority) {
 		t->childTids[i] = -1;
 	}
 	// // 표준 입출력 fd 등록
-	// t->fds[0] = STDIN_FILENO;
-	// t->fds[1] = STDOUT_FILENO;
-	// // fd2 : STDERR_FILENO 이지만 구현은 안되어있음.
-	// t->fds[2] = NULL;
-	// for(int i = 3; i < FDMAXCOUNT; i++)
-	// {
-	// 	t->fds[i] = NULL;
-	// }
+	t->fds[0] = NULL; // STDIN_FILENO;
+	t->fds[1] = NULL; // STDOUT_FILENO;
+	// fd2 : STDERR_FILENO 이지만 구현은 안되어있음.
+	t->fds[2] = NULL;
+	for(int i = 3; i < FDMAXCOUNT; i++)
+	{
+		t->fds[i] = NULL;
+	}
+
+
 	t->thread_exit_status = 0;
 	t->is_user = false;
 #endif
