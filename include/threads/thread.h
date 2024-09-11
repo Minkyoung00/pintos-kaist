@@ -10,6 +10,7 @@
 #include "vm/vm.h"
 #endif
 
+#define USERPROG
 
 /* States in a thread's life cycle. */
 enum thread_status {
@@ -111,6 +112,9 @@ struct thread {
 	void *fd_table[64];
 	int exit_code;
 	bool is_user;
+	struct thread *parent;
+	struct semaphore *wait_sema;
+	tid_t children[64];
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
@@ -175,5 +179,6 @@ void recalculate_priority(void);
 void update_load_avg(void);
 void thread_cpu (void);
 void recalculate_recent_cpu(void);
+struct thread*get_thread_by_tid (tid_t tid);
 
 #endif /* threads/thread.h */

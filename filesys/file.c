@@ -40,6 +40,7 @@ file_reopen (struct file *file) {
 struct file *
 file_duplicate (struct file *file) {
 	struct file *nfile = file_open (inode_reopen (file->inode));
+			printf("deny_write");
 	if (nfile) {
 		nfile->pos = file->pos;
 		if (file->deny_write)

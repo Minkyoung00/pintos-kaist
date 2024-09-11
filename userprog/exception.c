@@ -142,8 +142,7 @@ page_fault (struct intr_frame *f) {
 
 	if (not_present || user) 
 	{
-		thread_current()->exit_code = -1;
-		thread_exit();
+		set_code_and_exit(-1);
 	}
 
 #ifdef VM

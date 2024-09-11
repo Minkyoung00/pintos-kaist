@@ -18,6 +18,9 @@
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
+void set_code_and_exit(int exit_code);
+bool check_valid_mem(void* ptr);
+bool check_valid_fd(int fd);
 
 /* System call.
  *
@@ -50,50 +53,65 @@ void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
 	thread_current()->is_user = true;
-	// printf("%d",f->R.rax);
-	
-	// is_valid_mem(f);
 	
 	switch (f->R.rax) {
 	case SYS_HALT:                   /* Halt the operating system. */ 
+	{
 		power_off();
 		break;
+	}
 	case SYS_EXIT:                   /* Terminate this process. */
 	{
-		thread_current()->exit_code = f->R.rdi;
-		thread_exit();
+		set_code_and_exit(f->R.rdi);
 		break;
 	}
 	case SYS_FORK:                   /* Clone current process. */
 	{
 		char *thread_name = f->R.rdi;
-		// f->R.rbx = 
-		// f->rsp = 
-		// f->R.rbp = 
-		// f->R.r12 =
-		// f->R.r13 =
-		// f->R.r14 =
-		// f->R.r15 =
+		if (!check_valid_mem(thread_name)) {
+			f->R.rax = -1;
+			break;
+		}
+
 		f->R.rax = process_fork(thread_name, f);
+		
 		break;
 	}
 	case SYS_EXEC:                   /* Switch current process. */
+	{
+		char *file = f->R.rdi; 
+		if (!check_valid_mem(file)) break;
+		
+		char *fn_copy = palloc_get_page (0);
+		if (fn_copy == NULL)
+			return TID_ERROR;
+		strlcpy (fn_copy, file, PGSIZE);
+		
+		if (process_exec(fn_copy) < 0)
+		{
+			set_code_and_exit(-1);
+		}
 		break;
+	}
 	case SYS_WAIT:                   /* Wait for a child process to die. */
+	{
+		tid_t pid = f->R.rdi;
+
+		f->R.rax = process_wait(pid);
+		// thread_current()->children[pid] = NULL;
+
 		break;
+	}
 	case SYS_CREATE:                 /* Create a file. */
 	{
 		char *file = f->R.rdi; 
 		unsigned initial_size = f->R.rsi;
 
-		// if (file == NULL || is_kernel_vaddr(file))
-		if (file == NULL)
-		{
-			thread_current()->exit_code = -1;
-			thread_exit();
-		}
-		else
+		if (check_valid_mem(file))
 			f->R.rax = filesys_create(file, initial_size);
+		
+		else
+			set_code_and_exit(-1);
 		
 		break;
 	}
@@ -102,11 +120,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 	case SYS_OPEN: {				/* Open a file. */
 		char *file_name = f->R.rdi;
-		if (file_name == NULL || file_name == "")
-		{
-			f->R.rax = -1;
-			break;
-		}
+		if (!check_valid_mem(file_name))
+			set_code_and_exit(-1);
 
 		struct file* open_file = filesys_open(file_name);
 		
@@ -126,8 +141,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	case SYS_FILESIZE:               /* Obtain a file's size. */
 	{
 		int fd = f->R.rdi;
-		struct file* open_file = thread_current()->fd_table[fd]; 
-		f->R.rax = file_length(open_file);
+		if (check_valid_fd(fd))
+		{
+			struct file* open_file = thread_current()->fd_table[fd]; 
+			f->R.rax = file_length(open_file);
+		}
 	
 		break;
 	}
@@ -138,25 +156,28 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		void *buffer = f->R.rsi;
 		unsigned size = f->R.rdx;
 
+		if (!check_valid_fd(fd) || !check_valid_mem(buffer)) 
+			set_code_and_exit(-1);
+
 		if (fd == 0) 
-		{
-			input_getc();
-			f->R.rax = size;
-		}
+			f->R.rax = input_getc();
+
 		else
 		{
-			struct file* read_file = (struct file*)(thread_current()->fd_table[fd]);
+			struct file* read_file 
+					= (struct file*)(thread_current()->fd_table[fd]);
 			f->R.rax = file_read(read_file, buffer, size);
 		}
-
+			
 		break;
 	}
 	case SYS_WRITE: {                /* Write to a file. */
 		int fd = f->R.rdi;
 		void *buffer = f->R.rsi;
 		unsigned size = f->R.rdx;
-
-		// printf("fd: %d, buffer: %p, size: %d", fd, buffer, size);
+		
+		if (!check_valid_mem(buffer) || !check_valid_fd(fd)) 
+			set_code_and_exit(-1);
 
 		if (fd == 1) 
 		{
@@ -165,15 +186,17 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		}
 		else
 		{
-			char *contents = palloc_get_page (0);
-			if (contents == NULL)
-				return TID_ERROR;
-			strlcpy (contents, (char *)buffer, PGSIZE);
-
-			struct file* write_file = (struct file*)(thread_current()->fd_table[fd]);
-			f->R.rax = file_write(write_file, contents, size);
+			// ???????? 왜 palloc 하면 lg가 fail 나지??????
+			// char *contents = palloc_get_page (0);
+			// if (contents == NULL)
+			// 	return TID_ERROR;
+			// strlcpy (contents, (char *)buffer, PGSIZE);
 			
-			palloc_free_page (contents);
+			struct file* write_file 
+					= (struct file*)(thread_current()->fd_table[fd]);
+			f->R.rax = file_write(write_file, buffer, size);
+			
+			// palloc_free_page (contents);	
 		}
 		break;
 	}
@@ -184,16 +207,21 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	case SYS_CLOSE:                  /* Close a file. */
 	{
 		int fd = f->R.rdi;
-		struct file* close_file = thread_current()->fd_table[fd]; 
+
+		if (!check_valid_fd(fd)) break;
+		
+		struct file* close_file 
+				= thread_current()->fd_table[fd];
+		
 		file_close(close_file);
 		thread_current()->fd_table[fd] = NULL;
+	
 		break;
 	}
 
 	default:
 	{
-		thread_current()->exit_code = -1;
-		thread_exit();
+		set_code_and_exit(-1);
     	break;
 	}
 
@@ -217,12 +245,25 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	}
 }
 
-void 
-is_valid_mem(struct intr_frame *f){
-	if (is_kernel_vaddr(f->R.rdi)||
-	is_kernel_vaddr(f->R.rsi)||
-	is_kernel_vaddr(f->R.rdx)||
-	is_kernel_vaddr(f->R.r10)||
-	is_kernel_vaddr(f->R.r8)||
-	is_kernel_vaddr(f->R.r9)) thread_exit();
+bool 
+check_valid_mem(void* ptr){
+	if (ptr == NULL || !is_user_vaddr (ptr) || pml4_get_page(thread_current()->pml4, ptr) == NULL)
+		return false;
+	return true;
+}
+
+void
+set_code_and_exit(int exit_code){
+	thread_current()->exit_code = exit_code;
+	thread_exit();
+}
+
+bool
+check_valid_fd(int fd){
+	for (int i = 0; i < 64; i++)
+	{
+		if (fd == i && thread_current()->fd_table[i] != NULL)
+			return true;
+	}
+	return false;
 }
