@@ -87,11 +87,9 @@ typedef int tid_t;
  * only because they are mutually exclusive: only a thread in the
  * ready state is on the run queue, whereas only a thread in the
  * blocked state is on a semaphore wait list. */
-
-struct child{
+struct dead_child{
 	tid_t tid;
 	int exit_code;
-	bool alive;
 };
 
 struct thread {
@@ -116,12 +114,18 @@ struct thread {
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
-	void *fd_table[64];
+	void *fd_table[32];
 	int exit_code;
 	bool is_user;
+	bool is_waited;
 	struct thread *parent;
 	struct semaphore *wait_sema;
-	struct child children[64];
+	// tid_t children[64];
+	struct list child_list;
+	struct list_elem child_elem;
+	int child_code;
+	struct dead_child* dead_list[32];
+	struct file* exec_file;
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */

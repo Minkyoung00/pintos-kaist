@@ -657,25 +657,28 @@ init_thread (struct thread *t, const char *name, int priority) {
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
-	memset(t->fd_table, NULL, 64 * sizeof(void*));
+	memset(t->fd_table, NULL, 32 * sizeof(void*));
 	t->fd_table[0] = (void*)1;
 	t->fd_table[1] = (void*)1;
 	t->fd_table[2] = (void*)1;
 
-	/* 구조체를 담는 배열을 초기화할 때는 memset으로 할 수 없다. */
-	for (int i = 0; i < 64; i++) {
-        t->children[i].tid = 0;
-        t->children[i].exit_code = 0;
-        t->children[i].alive = false;
-    }
+	memset(t->dead_list, NULL, 32 * sizeof(struct dead_child*));
+	list_init(&t->child_list);
+	// list_init(&t->dead_list);
 
 	t->exit_code = 0;
+	t->child_code = 0;
 	t->is_user = false;
+	t->is_waited = false;
 
 	if (t == initial_thread)
 		t->parent = NULL;
 	else
+	{
 		t->parent = thread_current();
+		list_push_back(&thread_current()->child_list, &t->child_elem);
+	}
+		
 		
 	t->wait_sema = NULL;
 #endif
