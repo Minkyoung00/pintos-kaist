@@ -105,6 +105,7 @@ struct thread {
 	struct list_elem allelem;
 
 	int childTids[FDMAXCOUNT];
+	int childrenExitStatus;
 	struct thread* parent;
 	tid_t waitingThread;
 	
@@ -122,6 +123,7 @@ struct thread {
 
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
+	struct intr_frame user_if;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
 };
 

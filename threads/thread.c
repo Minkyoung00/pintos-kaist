@@ -231,7 +231,7 @@ thread_create (const char *name, int priority,
 		{
 			if(parent->childTids[i] == -1)
 			{
-				//printf("[%s]=>[%s] PARENTSET %d\n", t->name, parent->name, tid);
+				//printf("[%s]=>[%s] PARENTSET[%d]  %d\n", t->name, parent->name,  i, tid);
 				parent->childTids[i] = tid;
 				break;
 			}
@@ -631,6 +631,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	
 	// project2 added.
 #ifdef USERPROG
+	t->childrenExitStatus = -1;
 	t->parent = NULL;
 	t->waitingThread = -1;
 	for(int i = 0; i < FDMAXCOUNT; i++)
@@ -843,7 +844,7 @@ bool thread_has_child(tid_t tid)
 	
 	for(int i = 0; i < FDMAXCOUNT; i++)
 	{
-		//printf("[%s] thread_has_child[i]:%d,  %d:%d\n", curThread->name, i, curThread->childTids[i],tid);
+		//printf("[%s] thread_has_child[%d],  %d:%d\n", curThread->name, i, curThread->childTids[i],tid);
 		if(curThread->childTids[i] == tid)
 			return true;
 	}
