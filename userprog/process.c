@@ -194,11 +194,10 @@ __do_fork (void *aux) {
 	process_init ();
 	// memcpy(current->fd_table, parent->fd_table, 64 * sizeof(void*));
 
-	// for (int i = 0; i < 64; i++){
-	// 	printf("%d",i);
-	// 	if (parent->fd_table[i] != NULL)
-	// 		current->fd_table[i] = file_duplicate(parent->fd_table[i]);
-	// }
+	for (int i = 3; i < 64; i++){
+		if (parent->fd_table[i] != NULL)
+			current->fd_table[i] = file_duplicate((struct file*)parent->fd_table[i]);
+	}
 
 	sema_up(parent->wait_sema);
 
@@ -272,7 +271,7 @@ process_wait (tid_t child_tid UNUSED) {
 			if (get_thread_by_tid(child_tid) == NULL)
 				sema_down(&sema);
 			
-			thread_current()->children[i] = NULL;
+			thread_current()->children[i] = -1;
 
 			return get_thread_by_tid(child_tid)->exit_code;
 		}

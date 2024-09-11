@@ -116,8 +116,15 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		break;
 	}
 	case SYS_REMOVE:                 /* Delete a file. */
-		break;
+	{
+		char *file_name = f->R.rdi;
+		if (check_valid_mem(file_name)){
+			f->R.rax = filesys_remove(file_name);
+		}
+		else f->R.rax = false;
 
+		break;
+	}
 	case SYS_OPEN: {				/* Open a file. */
 		char *file_name = f->R.rdi;
 		if (!check_valid_mem(file_name))
@@ -201,8 +208,18 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		break;
 	}
 	case SYS_SEEK:                   /* Change position in a file. */
+	{
+		int fd = f->R.rdi;
+		unsigned position = f->R.rsi;
+
+		if (check_valid_fd(fd))
+			file_seek(thread_current()->fd_table[fd], position);
 		break;
+	}
 	case SYS_TELL:                   /* Report current position in a file. */
+		int fd = f->R.rdi;
+		if (check_valid_fd(fd))
+			f->R.rax = file_tell(thread_current()->fd_table[fd]);
 		break;
 	case SYS_CLOSE:                  /* Close a file. */
 	{
