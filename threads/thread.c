@@ -662,7 +662,13 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->fd_table[1] = (void*)1;
 	t->fd_table[2] = (void*)1;
 
-	memset(t->children, -1, 64 * sizeof(tid_t));
+	/* 구조체를 담는 배열을 초기화할 때는 memset으로 할 수 없다. */
+	for (int i = 0; i < 64; i++) {
+        t->children[i].tid = 0;
+        t->children[i].exit_code = 0;
+        t->children[i].alive = false;
+    }
+
 	t->exit_code = 0;
 	t->is_user = false;
 

@@ -61,16 +61,25 @@ process_create_initd (const char *file_name) {
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 	else{
-		// int i = 0;
-		// while(thread_current()->children[i] != -1){
-		// 	i++;
-		// }
-		// thread_current()->children[i] = tid;
 
 		int i = 0;
-		while(thread_current()->children[i] != -1 && i < 64) i++;
-		if (thread_current()->children[i] == -1)
-			thread_current()->children[i] = tid;
+		while(thread_current()->children[i].tid != 0 && i < 64) i++;
+		if (i < 64)
+		{	
+			thread_current()->children[i].tid = tid;
+			thread_current()->children[i].exit_code = 0;
+			thread_current()->children[i].alive = true;
+			// struct child child;
+			// child.tid = tid;
+			// child.exit_code = 0;	
+			// child.alive = true;
+
+			// thread_current()->children[i] = &child;
+
+			// printf("tid: %d\n",tid);
+			// printf("error_code: %d\n",thread_current()->children[i].exit_code);
+			// printf("alive: %d\n",thread_current()->children[i].alive);
+		}
 		else printf("CHILDREN LIST IS FULL!!");
 	}
 	return tid;
@@ -111,12 +120,21 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	// while(thread_current()->children[i] != -1) i++;
 	// thread_current()->children[i] = child_pid;
 	
+	// int i = 0;
+	// while(&(thread_current()->children[i]) != NULL && i < 64) i++;
+	// if (&(thread_current()->children[i]) == -1)
+	// 	thread_current()->children[i] = child_pid;
+	// else printf("CHILDREN LIST IS FULL!!");
 	int i = 0;
-	while(thread_current()->children[i] != -1 && i < 64) i++;
-	if (thread_current()->children[i] == -1)
-		thread_current()->children[i] = child_pid;
-	else printf("CHILDREN LIST IS FULL!!");
-	 
+	while(thread_current()->children[i].tid != 0 && i < 64) i++;
+	if (i < 64)
+	{	
+		thread_current()->children[i].tid = child_pid;
+		thread_current()->children[i].exit_code = 0;
+		thread_current()->children[i].alive = true;
+	}
+	else printf("CHILDREN LIST IS FULL!!"); 
+
 	struct semaphore sema;
 	sema_init(&sema,0);
 	thread_current()->wait_sema = &sema;
@@ -205,13 +223,17 @@ __do_fork (void *aux) {
 	 * TODO:       the resources of parent.*/
 	process_init ();
 	memcpy(current->fd_table, parent->fd_table, 64 * sizeof(void*));
-	memcpy(current->children, parent->children, 64 * sizeof(tid_t));
+	// memcpy(current->children, parent->children, 64 * sizeof(tid_t));
+	for (int i = 0; i < 64; i++) {
+        current->children[i].tid = parent->children[i].tid;
+        current->children[i].exit_code = parent->children[i].exit_code;
+        current->children[i].alive = parent->children[i].alive;
+    }
 
 	for (int i = 3; i < 64; i++){
 		if (parent->fd_table[i] != NULL)
 			current->fd_table[i] = file_duplicate((struct file*)parent->fd_table[i]);
 	}
-
 	sema_up(parent->wait_sema);
 
 	if_.R.rax = 0;
@@ -219,7 +241,7 @@ __do_fork (void *aux) {
 	if (succ)
 		do_iret (&if_);
 error:
-	// sema_up(parent->wait_sema);
+	sema_up(parent->wait_sema);
 	thread_exit ();
 }
 
@@ -270,21 +292,32 @@ process_wait (tid_t child_tid UNUSED) {
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
 
-	tid_t children[64]; 
-	memcpy(children, thread_current()->children, sizeof(tid_t) * 64);
+	// tid_t children[64]; 
+	// memcpy(children, thread_current()->children, sizeof(tid_t) * 64);
 
 	struct semaphore sema;
 	sema_init(&sema, 0);
 	thread_current()->wait_sema = &sema;
 	
 	for (int i = 0; i < 64; i ++){
-		if (children[i] == child_tid)
+		if (thread_current()->children[i].tid == child_tid)
 		{
+			// printf("tid: %d\n",thread_current()->children[i].tid);
+			// printf("error_code: %d\n",thread_current()->children[i].exit_code);
+			// printf("alive: %d\n",thread_current()->children[i].alive);
 			// while(get_thread_by_tid(child_tid) == NULL){}
-			if (get_thread_by_tid(child_tid) == NULL)
+			// if (get_thread_by_tid(child_tid) == NULL)
+			// 	sema_down(&sema);
+			if (thread_current()->children[i].alive == 1)
 				sema_down(&sema);
-			thread_current()->children[i] = -1;
-			return get_thread_by_tid(child_tid)->exit_code;
+
+			int child_exit_code = thread_current()->children[i].exit_code;
+			thread_current()->children[i].tid = 0;
+			return child_exit_code;
+			// struct thread *dead_child = get_thread_by_tid(child_tid);
+
+			// if (dead_child)
+			// 	return get_thread_by_tid(child_tid)->exit_code;
 		}
 	}
 	return -1;
@@ -300,6 +333,14 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	if (curr->is_user){
 		printf ("%s: exit(%d)\n", curr->name, curr->exit_code);
+
+		for(int i = 0; i < 64; i++){
+			if (curr->parent->children[i].tid == curr->tid){
+				curr->parent->children[i].alive = 0;
+				curr->parent->children[i].exit_code = curr->exit_code;
+			}
+		}
+
 		if (thread_current()->parent->wait_sema != NULL)
 			sema_up(thread_current()->parent->wait_sema);
 	}
@@ -439,7 +480,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Open executable file. */
 	file = filesys_open (argv[0]);
 	if (file == NULL) {
-		printf ("load: %s: open failed\n", file_name);
+		printf ("load: %s: open failed\n", argument);
 		goto done;
 	}
 

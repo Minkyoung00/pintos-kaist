@@ -66,7 +66,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		break;
 	}
 	case SYS_EXIT:                   /* Terminate this process. */
-	{
+	{	
 		set_code_and_exit(f->R.rdi);
 		break;
 	}
@@ -94,6 +94,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		
 		if (process_exec(fn_copy) < 0)
 		{
+			palloc_free_page(fn_copy);
 			f->R.rax = -1;
 			set_code_and_exit(-1);
 		}
@@ -150,7 +151,9 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			while(thread_current()->fd_table[i] && i < 64) i++;
 			if (thread_current()->fd_table[i] == NULL)
 				thread_current()->fd_table[i] = open_file;
-			else printf("FD_TABLE IS FULL!!");
+			else {
+				printf("FD_TABLE IS FULL!!");
+			}
 
 			f->R.rax = i;
 		}
