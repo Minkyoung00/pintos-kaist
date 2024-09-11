@@ -15,6 +15,7 @@
 #include <console.h>
 #include "devices/input.h"
 #include "userprog/process.h"
+#include "threads/synch.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -35,6 +36,8 @@ bool check_valid_fd(int fd);
 #define MSR_LSTAR 0xc0000082        /* Long mode SYSCALL target */
 #define MSR_SYSCALL_MASK 0xc0000084 /* Mask for the eflags */
 
+struct lock lock;
+
 void
 syscall_init (void) {
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
@@ -46,6 +49,8 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+	
+	lock_init(&lock);
 }
 
 /* The main system call interface */
@@ -89,6 +94,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		
 		if (process_exec(fn_copy) < 0)
 		{
+			f->R.rax = -1;
 			set_code_and_exit(-1);
 		}
 		break;
@@ -136,10 +142,15 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			f->R.rax = -1;
 		else
 		{
+			// int i = 0;
+			// while(thread_current()->fd_table[i] && i < 64) i ++;
+			// thread_current()->fd_table[i] = open_file;
+			
 			int i = 0;
-			while(thread_current()->fd_table[i])
-				i ++;
-			thread_current()->fd_table[i] = open_file;
+			while(thread_current()->fd_table[i] && i < 64) i++;
+			if (thread_current()->fd_table[i] == NULL)
+				thread_current()->fd_table[i] = open_file;
+			else printf("FD_TABLE IS FULL!!");
 
 			f->R.rax = i;
 		}
@@ -163,8 +174,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		void *buffer = f->R.rsi;
 		unsigned size = f->R.rdx;
 
-		if (!check_valid_fd(fd) || !check_valid_mem(buffer)) 
+		if (!check_valid_fd(fd) || !check_valid_mem(buffer)){
 			set_code_and_exit(-1);
+		} 
+
+		lock_acquire(&lock);
 
 		if (fd == 0) 
 			f->R.rax = input_getc();
@@ -175,7 +189,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					= (struct file*)(thread_current()->fd_table[fd]);
 			f->R.rax = file_read(read_file, buffer, size);
 		}
-			
+		lock_release(&lock);	
 		break;
 	}
 	case SYS_WRITE: {                /* Write to a file. */
@@ -183,9 +197,12 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		void *buffer = f->R.rsi;
 		unsigned size = f->R.rdx;
 		
-		if (!check_valid_mem(buffer) || !check_valid_fd(fd)) 
+		if (!check_valid_mem(buffer) || !check_valid_fd(fd)){
 			set_code_and_exit(-1);
+		} 
 
+		lock_acquire(&lock);
+		
 		if (fd == 1) 
 		{
 			putbuf(buffer, size);
@@ -205,6 +222,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			
 			// palloc_free_page (contents);	
 		}
+		lock_release(&lock);	
 		break;
 	}
 	case SYS_SEEK:                   /* Change position in a file. */
@@ -217,10 +235,12 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		break;
 	}
 	case SYS_TELL:                   /* Report current position in a file. */
+	{
 		int fd = f->R.rdi;
 		if (check_valid_fd(fd))
 			f->R.rax = file_tell(thread_current()->fd_table[fd]);
 		break;
+	}
 	case SYS_CLOSE:                  /* Close a file. */
 	{
 		int fd = f->R.rdi;

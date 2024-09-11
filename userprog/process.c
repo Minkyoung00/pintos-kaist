@@ -61,11 +61,17 @@ process_create_initd (const char *file_name) {
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 	else{
+		// int i = 0;
+		// while(thread_current()->children[i] != -1){
+		// 	i++;
+		// }
+		// thread_current()->children[i] = tid;
+
 		int i = 0;
-		while(thread_current()->children[i] != -1){
-			i++;
-		}
-		thread_current()->children[i] = tid;
+		while(thread_current()->children[i] != -1 && i < 64) i++;
+		if (thread_current()->children[i] == -1)
+			thread_current()->children[i] = tid;
+		else printf("CHILDREN LIST IS FULL!!");
 	}
 	return tid;
 }
@@ -101,10 +107,16 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	tid_t child_pid = thread_create (name, 
 							PRI_DEFAULT, __do_fork, &aux);
 
-	int i = 0;
-	while(thread_current()->children[i] != -1) i++;
-	thread_current()->children[i] = child_pid;
+	// int i = 0;
+	// while(thread_current()->children[i] != -1) i++;
+	// thread_current()->children[i] = child_pid;
 	
+	int i = 0;
+	while(thread_current()->children[i] != -1 && i < 64) i++;
+	if (thread_current()->children[i] == -1)
+		thread_current()->children[i] = child_pid;
+	else printf("CHILDREN LIST IS FULL!!");
+	 
 	struct semaphore sema;
 	sema_init(&sema,0);
 	thread_current()->wait_sema = &sema;
@@ -192,7 +204,8 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 	process_init ();
-	// memcpy(current->fd_table, parent->fd_table, 64 * sizeof(void*));
+	memcpy(current->fd_table, parent->fd_table, 64 * sizeof(void*));
+	memcpy(current->children, parent->children, 64 * sizeof(tid_t));
 
 	for (int i = 3; i < 64; i++){
 		if (parent->fd_table[i] != NULL)
@@ -270,9 +283,7 @@ process_wait (tid_t child_tid UNUSED) {
 			// while(get_thread_by_tid(child_tid) == NULL){}
 			if (get_thread_by_tid(child_tid) == NULL)
 				sema_down(&sema);
-			
 			thread_current()->children[i] = -1;
-
 			return get_thread_by_tid(child_tid)->exit_code;
 		}
 	}
