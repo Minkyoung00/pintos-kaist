@@ -9,6 +9,7 @@
         "malloc.h": "c",
         "thread.h": "c",
         "process.h": "c",
-        "loader.h": "c"
+        "loader.h": "c",
+        "stdint.h": "c"
     }
 }

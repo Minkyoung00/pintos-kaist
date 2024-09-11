@@ -213,7 +213,7 @@ int
 process_exec (void *f_name) {
 	char *file_name = f_name;
 	bool success;
-
+	
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
@@ -252,37 +252,28 @@ process_exec (void *f_name) {
  * does nothing. */
 int
 process_wait (tid_t child_tid) {
-	//printf("Process_Wait!!\n");
+	struct thread* curThread = thread_current();
 	if(!thread_has_child(child_tid))
 	{
-			//printf("0000\n");
-		if(thread_current()->childrenExitStatus != -1)
+		if(curThread->childrenExitStatus != -1)
 		{
-			//printf("11111\n");
-			int ret = thread_current()->childrenExitStatus;
-			thread_current()->childrenExitStatus = -1;
+			int ret = curThread->childrenExitStatus;
+			curThread->childrenExitStatus = -1;
 			return ret;
 		}
-		//printf("No Child err. return -1\n");
 		return -1;
 	}
-	// unsigned long long i = 0;
-	// while (i < (unsigned long long)1<<32)
-	// {
-	// 	i++;
-	// }
-	// return 0;
 	
 
-	thread_current()->waitingThread = child_tid;
+	curThread->waitingThread = child_tid;
 	// 해당 쓰레드 끝날 때까지 무한 대기
 	enum intr_level old_level = intr_disable();
 	thread_block();
 	
 	intr_set_level(old_level);
-	thread_current()->waitingThread = -1;
+	curThread->waitingThread = -1;
+	curThread->childrenExitStatus = -1;
 	
-	//printf("Process_exit 4444\n");
 	return get_thread_by_tid(child_tid)->thread_exit_status;
 }
 
@@ -429,6 +420,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	int argc = 0, len = 0;
 	char *token, *save_ptr;
 
+	//printf("%s aaaaaaaaaaaaa\n", file_name);
 	// 인자 쪼개기
 	for(token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
 	{
@@ -438,6 +430,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* Open executable file. */
 	file = filesys_open (argv[0]);
+	//printf("%s aaaaaaaaaaaaa\n", argv[0]);
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", argv[0]);
 		goto done;

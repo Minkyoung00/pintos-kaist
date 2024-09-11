@@ -12,6 +12,8 @@
 #include "userprog/process.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "threads/palloc.h"
+
 
 /* Process identifier. */
 typedef int pid_t;
@@ -95,7 +97,7 @@ syscall_handler (struct intr_frame *f) {
 	case SYS_FILESIZE://8
 		f->R.rax = filesize(f->R.rdi);
 		break;
-	case SYS_READ://9
+	case SYS_READ:	//9
 		f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
 	 	break;
 	case SYS_WRITE:	//10
@@ -126,16 +128,18 @@ pid_t fork (const char *thread_name, struct intr_frame *f)
 {
 	pid_t ret = process_fork(thread_name, f);
 
-
 	return ret;
 }
 int exec (const char *cmd_line)
 {
-	char *line;
-	strlcpy(line, cmd_line, strlen(cmd_line));
+	char *line = palloc_get_page(PAL_ZERO);
+
+	strlcpy(line, cmd_line, PGSIZE);
 	int ret = process_exec(line);
 
-
+	if(ret == -1)
+		exit(-1);
+		
 	return ret;
 }
 
