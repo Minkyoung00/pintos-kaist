@@ -665,6 +665,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	memset(t->children, -1, 64 * sizeof(tid_t));
 	t->exit_code = 0;
 	t->is_user = false;
+	t->exec_file = NULL;
 
 	if (t == initial_thread)
 		t->parent = NULL;

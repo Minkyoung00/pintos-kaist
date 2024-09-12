@@ -115,6 +115,7 @@ struct thread {
 	struct thread *parent;
 	struct semaphore *wait_sema;
 	tid_t children[64];
+	struct file *exec_file;
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */

@@ -300,6 +300,12 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	if (curr->is_user){
 		printf ("%s: exit(%d)\n", curr->name, curr->exit_code);
+
+		if (thread_current()->exec_file)
+			file_close(thread_current()->exec_file);
+			// file_allow_write(thread_current()->exec_file);	
+		thread_current()->exec_file = NULL;
+
 		if (thread_current()->parent->wait_sema != NULL)
 			sema_up(thread_current()->parent->wait_sema);
 	}
@@ -540,9 +546,14 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	success = true;
 
+	thread_current()->exec_file = file;
+	file_deny_write(thread_current()->exec_file);
+
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close (file);
+	// file_close (file);
+	if (!success)
+		file_close (file);
 	return success;
 }
 

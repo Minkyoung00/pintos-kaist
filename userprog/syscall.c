@@ -91,7 +91,12 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		if (fn_copy == NULL)
 			return TID_ERROR;
 		strlcpy (fn_copy, file, PGSIZE);
-		
+
+		if (thread_current()->exec_file != NULL)
+			file_close(thread_current()->exec_file);
+			// file_allow_write(thread_current()->exec_file);	
+		thread_current()->exec_file = NULL;
+
 		if (process_exec(fn_copy) < 0)
 		{
 			f->R.rax = -1;
