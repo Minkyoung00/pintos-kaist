@@ -32,15 +32,15 @@ test_priority_donate_multiple (void)
   lock_init (&a);
   lock_init (&b);
 
-  lock_acquire (&a);
-  lock_acquire (&b);
+  lock_acquire (&a); // &a->ori_priority 31
+  lock_acquire (&b); // &a->ori_priority 31
 
-  thread_create ("a", PRI_DEFAULT + 1, a_thread_func, &a);
-  msg ("Main thread should have priority %d.  Actual priority: %d.",
-       PRI_DEFAULT + 1, thread_get_priority ());
+  thread_create ("a", PRI_DEFAULT + 1, a_thread_func, &a);  // &a->ori_priority 31
+  msg ("Main thread should have priority %d.  Actual priority: %d.", // 32
+       PRI_DEFAULT + 1, thread_get_priority ());   
 
-  thread_create ("b", PRI_DEFAULT + 2, b_thread_func, &b);
-  msg ("Main thread should have priority %d.  Actual priority: %d.",
+  thread_create ("b", PRI_DEFAULT + 2, b_thread_func, &b);  // &b->ori_priority 32
+  msg ("Main thread should have priority %d.  Actual priority: %d.", // 33
        PRI_DEFAULT + 2, thread_get_priority ());
 
   lock_release (&b);

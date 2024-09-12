@@ -24,6 +24,8 @@ struct lock {
 	struct list_elem elem;
 
 	int oldPriority;
+	
+	int ori_priority;
 };
 
 void lock_init (struct lock *);

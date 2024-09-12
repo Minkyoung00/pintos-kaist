@@ -29,6 +29,9 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 
+/* init.c에서 호출*/
+/* 일정한 간격으로 인터럽트를 발생시켜, 운영체제나 다른 시스템 SW가 */
+/* 시간을 추적하거나 특정 작업을 일정 주기로 수행하도록 하는 타이머칩 실행*/
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
    corresponding interrupt. */
@@ -71,13 +74,16 @@ timer_calibrate (void) {
 }
 
 /* Returns the number of timer ticks since the OS booted. */
+/* */
 int64_t
 timer_ticks (void) {
-	enum intr_level old_level = intr_disable ();
+	enum intr_level old_level = intr_disable (); // 인터럽트를 비활성화하고 이전 상태값 old_level에 저장 
 	int64_t t = ticks;
-	intr_set_level (old_level);
+	// intr_set_level (old_level); // 인터럽트 활성화
+	intr_enable(); 				   // 위의 코드랑 같은 기능(?)
 	barrier ();
 	return t;
+
 }
 
 /* Returns the number of timer ticks elapsed since THEN, which
@@ -90,11 +96,12 @@ timer_elapsed (int64_t then) {
 /* Suspends execution for approximately TICKS timer ticks. */
 void
 timer_sleep (int64_t ticks) {
-	int64_t start = timer_ticks ();
-
+	int64_t start = timer_ticks (); 
+									
 	ASSERT (intr_get_level () == INTR_ON);
 
-	Thread_Sleep(start + ticks);
+	thread_sleep(start, ticks);
+
 	// while (timer_elapsed (start) < ticks)
 	// 	thread_yield ();
 }
@@ -126,7 +133,23 @@ timer_print_stats (void) {
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
-	ticks++;
+	ASSERT (intr_get_level () == INTR_OFF);
+	ticks++; 
+
+	thread_wake (ticks);
+	if (thread_mlfqs)
+	{
+		thread_cpu (); 					
+
+		if (ticks % TIMER_FREQ == 0)
+		{
+			update_load_avg();
+			recalculate_recent_cpu();
+		}
+		
+		if (ticks % 4 == 0)			
+			recalculate_priority();
+	}
 	thread_tick ();
 
 	//MLFQS

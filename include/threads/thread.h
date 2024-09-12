@@ -5,10 +5,12 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+// #include "devices/timer.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
 
+#define USERPROG
 
 /* States in a thread's life cycle. */
 enum thread_status {
@@ -105,27 +107,44 @@ typedef int tid_t;
  * only because they are mutually exclusive: only a thread in the
  * ready state is on the run queue, whereas only a thread in the
  * blocked state is on a semaphore wait list. */
+struct dead_child{
+	tid_t tid;
+	int exit_code;
+};
+
 struct thread {
 	/* Owned by thread.c. */
 	tid_t tid;                          /* Thread identifier. */
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
-
-	int64_t wakeTime;
-	struct list lock_list;
+	int origin_priority;
+	int donated_cnt;
+	struct semaphore *sema;
+	struct lock *waiting_lock; 
 	
-	struct lock* waitLock;
-
 	int nice;
 	int recent_cpu;
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 	struct list_elem all_elem;          /* List element. */
+	struct list_elem blocked_elem;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
+	void *fd_table[32];
+	int exit_code;
+	bool is_user;
+	bool is_waited;
+	struct thread *parent;
+	struct semaphore *wait_sema;
+	// tid_t children[64];
+	struct list child_list;
+	struct list_elem child_elem;
+	int child_code;
+	struct dead_child* dead_list[32];
+	struct file* exec_file;
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
@@ -135,6 +154,17 @@ struct thread {
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
+};
+
+struct sleep_elem{
+    struct list_elem elem;
+    struct semaphore *sema;
+    int64_t wake_t;
+};
+
+struct blocked_elem{
+	struct list_elem elem;
+	struct thread *thread;
 };
 
 /* If false (default), use round-robin scheduler.
@@ -170,6 +200,16 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+
+void thread_sleep (int64_t start, int64_t ticks);
+void thread_wake (int64_t ticks);
+void update_list(struct list* list, struct thread *t);
+int nice_to_priority(struct thread *t, int nice);
+void recalculate_priority(void);
+void update_load_avg(void);
+void thread_cpu (void);
+void recalculate_recent_cpu(void);
+struct thread*get_thread_by_tid (tid_t tid);
 
 #endif /* threads/thread.h */
 
