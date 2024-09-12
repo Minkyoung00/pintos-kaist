@@ -51,32 +51,6 @@ sema_init (struct semaphore *sema, unsigned value) {
 	list_init (&sema->waiters);
 }
 
-// 쓰레드 풀에 넣을 때 priority 순서로 넣어보자.
-static bool priority_less (const struct list_elem *a_, 
-	const struct list_elem *b_, void *aux UNUSED)
-{
-  const struct thread *a = list_entry (a_, struct thread, elem);
-  const struct thread *b = list_entry (b_, struct thread, elem);
-  
-  return a->priority > b->priority;
-}
-static bool priority_greater (const struct list_elem *a_, 
-	const struct list_elem *b_, void *aux UNUSED)
-{
-  const struct thread *a = list_entry (a_, struct thread, elem);
-  const struct thread *b = list_entry (b_, struct thread, elem);
-  
-  return a->priority < b->priority;
-}
-
-static bool lock_less (const struct list_elem *a_, 
-	const struct list_elem *b_, void *aux UNUSED)
-{
-  const struct lock *a = list_entry (a_, struct lock, elem);
-  const struct lock *b = list_entry (b_, struct lock, elem);
-  
-  return a->oldPriority < b->oldPriority;
-}
 /* Down or "P" operation on a semaphore.  Waits for SEMA's value
    to become positive and then atomically decrements it.
 
@@ -150,7 +124,6 @@ sema_up (struct semaphore *sema) {
 	ASSERT (sema != NULL);
 
 	old_level = intr_disable ();
-	sema->value++;
 	if (!list_empty (&sema->waiters))
 	{
 		struct thread *front = list_entry (list_pop_front (&sema->waiters),
@@ -371,17 +344,6 @@ cond_init (struct condition *cond) {
 	list_init (&cond->waiters);
 }
 
-
-static bool sema_greater (const struct list_elem *a_, 
-	const struct list_elem *b_, void *aux UNUSED)
-{
-  const struct semaphore_elem *a = list_entry (a_, struct semaphore_elem, elem);
-  const struct semaphore_elem *b = list_entry (b_, struct semaphore_elem, elem);
-  
-  return list_entry (list_front(&(a->semaphore.waiters)), struct thread, elem)->priority <
-   list_entry (list_front(&(b->semaphore.waiters)), struct thread, elem)->priority;
-}
-
 /* Atomically releases LOCK and waits for COND to be signaled by
    some other piece of code.  After COND is signaled, LOCK is
    reacquired before returning.  LOCK must be held before calling
@@ -471,43 +433,4 @@ cond_broadcast (struct condition *cond, struct lock *lock) {
 
 	while (!list_empty (&cond->waiters))
 		cond_signal (cond, lock);
-}
-void priority_donate(struct lock* lock)
-{	
-	ASSERT(!thread_mlfqs);
-	if(lock->holder != NULL)
-	{
-		if(lock->oldPriority == LOCKINITPRI)
-		{
-			lock->oldPriority = lock->holder->priority;
-			list_insert_ordered(&lock->holder->lock_list, &lock->elem, lock_less, NULL);
-		}
-
-		while (lock->holder->waitLock != NULL)
-		{
-			lock->holder->priority = thread_current()->priority;
-			lock = lock->holder->waitLock;
-		}
-		
-		lock->holder->priority = thread_current()->priority;
-	}
-}
-void priority_donate_release(struct lock* lock)
-{
-	ASSERT(!thread_mlfqs);
-	struct list_elem *cur = &(lock->elem);
-
-	if(lock->oldPriority != LOCKINITPRI)
-	{
-		if(list_next(cur) == list_end(&lock->holder->lock_list)){
-			lock->holder->priority = lock->oldPriority;
-		}
-		else
-		{
-			list_entry(list_next(cur), struct lock, elem)->oldPriority = lock->oldPriority;
-		}
-		list_remove(cur);
-	}
-
-	lock->oldPriority = LOCKINITPRI;
 }

@@ -26,9 +26,7 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
-static struct list all_list;
 static struct list ready_list;
-static struct list sleep_list;
 static struct list blocked_list;
 
 /* Project 1. Alarm Clock */
@@ -71,8 +69,6 @@ static void init_thread (struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
-
-static int load_avg = 0;
 static bool priority_more(const struct list_elem *a_, const struct list_elem *b_,
             			void *aux UNUSED);
 
@@ -118,19 +114,14 @@ thread_init (void) {
 	};
 	lgdt (&gdt_ds);
 
-	/* Init the global thread context */
+	/* Init the globla thread context */
 	lock_init (&tid_lock);
-	list_init (&all_list);
 	list_init (&ready_list);
-	list_init (&sleep_list);
 	list_init (&destruction_req);
-
-	//load_avg = 0;
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
 	init_thread (initial_thread, "main", PRI_DEFAULT);
-	initial_thread->recent_cpu = 0;
 	initial_thread->status = THREAD_RUNNING;
 	initial_thread->tid = allocate_tid ();
 
@@ -351,17 +342,6 @@ thread_unblock (struct thread *t) {
 	intr_set_level (old_level);
 }
 
-// 쓰레드 풀에 넣을 때 priority 순서로 넣어보자.
-static bool priority_less (const struct list_elem *a_, 
-	const struct list_elem *b_, void *aux UNUSED)
-{
-  const struct thread *a = list_entry (a_, struct thread, elem);
-  const struct thread *b = list_entry (b_, struct thread, elem);
-  
-  return a->priority > b->priority;
-}
-
-
 /* Returns the name of the running thread. */
 const char *
 thread_name (void) {
@@ -405,7 +385,6 @@ thread_exit (void) {
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
 	intr_disable ();
-	list_remove(&thread_current()->all_elem);
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();
 }
@@ -457,22 +436,13 @@ thread_set_priority (int new_priority) {
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) {
-	enum intr_level old_level = intr_disable ();
-	int temp = thread_current ()->priority;
-	intr_set_level (old_level);
-	return temp;
+	return thread_current ()->priority;
 }
 
 /////////////////////////////////////////////////////////////////////////////////
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int nice UNUSED) {
-	enum intr_level old_level = intr_disable ();
-	struct thread* cur = thread_current(); 
-	cur->nice = nice;
-	//MLFQS_SetPri(thread_current());
-	MLFQS_SetPri(cur);
-	Thread_Preempt();
 	/* TODO: Your implementation goes here */
 	struct thread *t = thread_current ();
 	t->nice = nice;
@@ -485,7 +455,6 @@ thread_set_nice (int nice UNUSED) {
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) {
-	enum intr_level old_level = intr_disable ();
 	/* TODO: Your implementation goes here */
 	return thread_current ()->nice;
 }
