@@ -115,7 +115,6 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	while(thread_current()->children[i] != -1 && i < 32) 
 	{
 		i++;
-		printf("%d\n", i);
 	}
 	
 	if (i < 32)
