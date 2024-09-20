@@ -155,7 +155,10 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			while(thread_current()->fd_table[i] && i < 64) i++;
 			if (thread_current()->fd_table[i] == NULL)
 				thread_current()->fd_table[i] = open_file;
-			else printf("FD_TABLE IS FULL!!");
+			// else printf("FD_TABLE IS FULL!!");
+
+			if (!strcmp(thread_current()->name, file_name))
+				file_deny_write(thread_current()->exec_file);
 
 			f->R.rax = i;
 		}

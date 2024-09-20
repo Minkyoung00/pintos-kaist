@@ -657,12 +657,12 @@ init_thread (struct thread *t, const char *name, int priority) {
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
-	memset(t->fd_table, NULL, 64 * sizeof(void*));
+	memset(t->fd_table, NULL, 32 * sizeof(void*));
 	t->fd_table[0] = (void*)1;
 	t->fd_table[1] = (void*)1;
 	t->fd_table[2] = (void*)1;
 
-	memset(t->children, -1, 64 * sizeof(tid_t));
+	memset(t->children, -1, 32 * sizeof(tid_t));
 	t->exit_code = 0;
 	t->is_user = false;
 	t->exec_file = NULL;
@@ -671,8 +671,11 @@ init_thread (struct thread *t, const char *name, int priority) {
 		t->parent = NULL;
 	else
 		t->parent = thread_current();
-		
-	t->wait_sema = NULL;
+
+	sema_init(&t->wait_sema , 0);
+	sema_init(&t->exit_sema, 0);	
+	sema_init(&t->fork_sema, 0);		
+
 #endif
 }
 
@@ -860,6 +863,34 @@ get_thread_by_tid (tid_t tid){
 	struct thread *t;
 
 	for (e =list_begin (&destruction_req); e != list_end (&destruction_req); e = list_next (e))
+	{
+		t = list_entry(e, struct thread, elem);
+		if (t->tid == tid)
+			return t;
+	}
+
+	return NULL;
+} 
+
+struct thread*
+get_alive_by_tid (tid_t tid){
+	struct list_elem *e;
+	struct thread *t;
+
+	for (e =list_begin (&blocked_list); e != list_end (&blocked_list); e = list_next (e))
+	{
+		t = list_entry(e, struct thread, blocked_elem);
+		if (t->tid == tid)
+			return t;
+	}
+	// for (e =list_begin (&thread_current()->exit_sema->waiters); e != list_end (&thread_current()->exit_sema->waiters); e = list_next (e))
+	// {
+	// 	t = list_entry(e, struct thread, elem);
+	// 	if (t->tid == tid)
+	// 		return t;
+	// }
+
+	for (e =list_begin (&ready_list); e != list_end (&ready_list); e = list_next (e))
 	{
 		t = list_entry(e, struct thread, elem);
 		if (t->tid == tid)

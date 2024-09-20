@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 // #include "devices/timer.h"
 #ifdef VM
 #include "vm/vm.h"
@@ -109,12 +110,14 @@ struct thread {
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
-	void *fd_table[64];
+	void *fd_table[32];
 	int exit_code;
 	bool is_user;
 	struct thread *parent;
-	struct semaphore *wait_sema;
-	tid_t children[64];
+	struct semaphore wait_sema;
+	struct semaphore exit_sema;
+	struct semaphore fork_sema;
+	tid_t children[32];
 	struct file *exec_file;
 #endif
 #ifdef VM
@@ -181,5 +184,6 @@ void update_load_avg(void);
 void thread_cpu (void);
 void recalculate_recent_cpu(void);
 struct thread*get_thread_by_tid (tid_t tid);
+struct thread*get_alive_by_tid (tid_t tid);
 
 #endif /* threads/thread.h */

@@ -68,7 +68,7 @@ process_create_initd (const char *file_name) {
 		// thread_current()->children[i] = tid;
 
 		int i = 0;
-		while(thread_current()->children[i] != -1 && i < 64) i++;
+		while(thread_current()->children[i] != -1 && i < 32) i++;
 		if (thread_current()->children[i] == -1)
 			thread_current()->children[i] = tid;
 		else printf("CHILDREN LIST IS FULL!!");
@@ -106,21 +106,30 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
  	// printf("pml4: %p\n",thread_current()->pml4);
 	tid_t child_pid = thread_create (name, 
 							PRI_DEFAULT, __do_fork, &aux);
-
+	
 	// int i = 0;
 	// while(thread_current()->children[i] != -1) i++;
 	// thread_current()->children[i] = child_pid;
 	
 	int i = 0;
-	while(thread_current()->children[i] != -1 && i < 64) i++;
-	if (thread_current()->children[i] == -1)
+	while(thread_current()->children[i] != -1 && i < 32) 
+	{
+		i++;
+		printf("%d\n", i);
+	}
+	
+	if (i < 32)
 		thread_current()->children[i] = child_pid;
 	else printf("CHILDREN LIST IS FULL!!");
 	 
-	struct semaphore sema;
-	sema_init(&sema,0);
-	thread_current()->wait_sema = &sema;
-	sema_down(&sema);		
+	sema_down(&thread_current()->fork_sema);	
+
+	struct thread* child = get_alive_by_tid(child_pid);
+	if (child->exit_code == -1){
+		thread_current()->children[i] = -1;
+		sema_up(&child->wait_sema);
+		return -1;	
+	}	
 
 	return child_pid;
 }
@@ -204,15 +213,15 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 	process_init ();
-	memcpy(current->fd_table, parent->fd_table, 64 * sizeof(void*));
-	memcpy(current->children, parent->children, 64 * sizeof(tid_t));
+	memcpy(current->fd_table, parent->fd_table, 32 * sizeof(void*));
+	// memcpy(current->children, parent->children, 64 * sizeof(tid_t));
 
-	for (int i = 3; i < 64; i++){
+	for (int i = 3; i < 32; i++){
 		if (parent->fd_table[i] != NULL)
 			current->fd_table[i] = file_duplicate((struct file*)parent->fd_table[i]);
 	}
 
-	sema_up(parent->wait_sema);
+	sema_up(&parent->fork_sema);
 
 	if_.R.rax = 0;
 	/* Finally, switch to the newly created process. */
@@ -220,6 +229,8 @@ __do_fork (void *aux) {
 		do_iret (&if_);
 error:
 	// sema_up(parent->wait_sema);
+	current->exit_code = -1;
+	sema_up(&parent->fork_sema);
 	thread_exit ();
 }
 
@@ -270,21 +281,32 @@ process_wait (tid_t child_tid UNUSED) {
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
 
-	tid_t children[64]; 
-	memcpy(children, thread_current()->children, sizeof(tid_t) * 64);
+	// tid_t children[64]; 
+	// memcpy(children, thread_current()->children, sizeof(tid_t) * 64);
 
-	struct semaphore sema;
-	sema_init(&sema, 0);
-	thread_current()->wait_sema = &sema;
 	
-	for (int i = 0; i < 64; i ++){
-		if (children[i] == child_tid)
+	for (int i = 0; i < 32; i ++){
+		if (thread_current()->children[i] == child_tid)
 		{
+			// struct thread* child = get_thread_by_tid(child_tid);
+
+			// if (child) return -1;
 			// while(get_thread_by_tid(child_tid) == NULL){}
-			if (get_thread_by_tid(child_tid) == NULL)
-				sema_down(&sema);
+			// else{
+			struct thread* child = get_alive_by_tid(child_tid);
+			sema_down(&child->wait_sema);
+			// }
+			// printf("2\n");
+			// int exit_code = 0;
+			int exit_code = child->exit_code;
+		
 			thread_current()->children[i] = -1;
-			return get_thread_by_tid(child_tid)->exit_code;
+			
+			sema_up(&child->exit_sema);
+			// if (child)
+			// 	sema_up(&child->exit_sema);
+			// return get_thread_by_tid(child_tid)->exit_code;
+			return exit_code;
 		}
 	}
 	return -1;
@@ -300,15 +322,23 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	if (curr->is_user){
 		printf ("%s: exit(%d)\n", curr->name, curr->exit_code);
-
-		if (thread_current()->exec_file)
-			file_close(thread_current()->exec_file);
-			// file_allow_write(thread_current()->exec_file);	
-		thread_current()->exec_file = NULL;
-
-		if (thread_current()->parent->wait_sema != NULL)
-			sema_up(thread_current()->parent->wait_sema);
 	}
+
+	if (curr->exec_file)
+		file_close(curr->exec_file);
+		// file_allow_write(thread_current()->exec_file);	
+	curr->exec_file = NULL;
+
+	// if (curr->parent->wait_sema != NULL)
+	sema_up(&curr->wait_sema);
+
+	// if (thread_current()->parent->exit_sema != NULL)
+	sema_down(&curr->exit_sema);
+	// if (thread_current()->parent->wait_sema != NULL){
+	// 	if (!cnt_child)
+	// 		sema_up(thread_current()->parent->wait_sema);
+	// }
+	
 	process_cleanup ();
 }
 
@@ -547,7 +577,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	success = true;
 
 	thread_current()->exec_file = file;
-	file_deny_write(thread_current()->exec_file);
+	// file_deny_write(thread_current()->exec_file);
 
 done:
 	/* We arrive here whether the load is successful or not. */
