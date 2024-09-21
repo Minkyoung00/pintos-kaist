@@ -111,11 +111,25 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	// if (thread_current()->children[i] == -1)
 	// 	thread_current()->children[i] = child_pid;
 	// else set_code_and_exit(-1);
-	 
+
 	struct semaphore sema;
 	sema_init(&sema,0);
 	thread_current()->wait_sema = &sema;
-	sema_down(&sema);		
+	sema_down(&sema);	
+	
+	struct list_elem *e;
+	struct thread *t = NULL;
+	for (e =list_begin (&thread_current()->child_list); e != list_end (&thread_current()->child_list); e = list_next (e))
+	{
+		t = list_entry(e, struct thread, child_elem);
+		if (t->tid == child_pid) break;
+	}
+
+	if (t->exit_code == -1){
+		list_remove(&t->child_elem);
+		sema_up(&t->wait_sema);
+		return -1;	
+	}	
 	
 	return child_pid;
 }
@@ -138,7 +152,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
-	newpage = palloc_get_page (0);
+	newpage = palloc_get_page (PAL_USER);
 	if (newpage == NULL)
 		return TID_ERROR;
 
@@ -212,6 +226,7 @@ __do_fork (void *aux) {
 	if (succ)
 		do_iret (&if_);
 error:
+	current->exit_code = -1;
 	sema_up(parent->wait_sema);
 	thread_exit ();
 }
