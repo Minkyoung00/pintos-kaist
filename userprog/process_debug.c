@@ -99,6 +99,7 @@ struct fork_args {
  * TID_ERROR if the thread cannot be created. */
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+	printf("(process_fork) tid: %d\n", thread_current()->tid);
 	/* Clone current thread to new thread.*/
 	struct fork_args aux;
 	aux.thread = thread_current ();
@@ -124,9 +125,10 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	sema_down(&thread_current()->fork_sema);	
 
 	struct thread* child = get_alive_by_tid(child_pid);
+	printf("child->exit_code: %d\n",child->exit_code);
 	if (child->exit_code == -1){
 		thread_current()->children[i] = -1;
-		sema_up(&child->wait_sema);
+		sema_up(&child->exit_sema);
 		return -1;	
 	}	
 
@@ -151,7 +153,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
-	newpage = palloc_get_page (PAL_USER);
+	newpage = palloc_get_page (0);
 	if (newpage == NULL)
 		return TID_ERROR;
 
@@ -178,6 +180,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
  *       this function. */
 static void
 __do_fork (void *aux) {
+	printf("__do_fork tid: %d\n", thread_current()->tid);
 	struct intr_frame if_;
 	// struct thread *parent = (struct thread *) aux;
 	struct thread *parent = ((struct fork_args *)aux)->thread;
@@ -237,6 +240,7 @@ error:
  * Returns -1 on fail. */
 int
 process_exec (void *f_name) {
+	printf("process_exec tid: %d\n", thread_current()->tid);
 	char *file_name = f_name;
 	bool success;
 
@@ -276,6 +280,7 @@ process_exec (void *f_name) {
  * does nothing. */
 int
 process_wait (tid_t child_tid UNUSED) {
+	printf("process_wait tid: %d\n", thread_current()->tid);
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
@@ -301,7 +306,7 @@ process_wait (tid_t child_tid UNUSED) {
 		
 			thread_current()->children[i] = -1;
 			
-			sema_up(&child->exit_sema);
+			// sema_up(&child->exit_sema);
 			// if (child)
 			// 	sema_up(&child->exit_sema);
 			// return get_thread_by_tid(child_tid)->exit_code;
@@ -314,6 +319,7 @@ process_wait (tid_t child_tid UNUSED) {
 /* Exit the process. This function is called by thread_exit (). */
 void
 process_exit (void) {
+	printf("process_exit tid: %d\n", thread_current()->tid);
 	struct thread *curr = thread_current ();
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
@@ -329,7 +335,9 @@ process_exit (void) {
 	curr->exec_file = NULL;
 
 	// if (curr->parent->wait_sema != NULL)
+	printf ("curr sema val1: %d\n",curr->wait_sema.value);
 	sema_up(&curr->wait_sema);
+	printf ("curr sema val2: %d\n",curr->wait_sema.value);
 
 	// if (thread_current()->parent->exit_sema != NULL)
 	sema_down(&curr->exit_sema);
