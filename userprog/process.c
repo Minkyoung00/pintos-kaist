@@ -103,6 +103,7 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	struct fork_args aux;
 	aux.thread = thread_current ();
 	aux.if_ = if_;
+	
  	// printf("pml4: %p\n",thread_current()->pml4);
 	tid_t child_pid = thread_create (name, 
 							PRI_DEFAULT, __do_fork, &aux);
@@ -110,6 +111,7 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	// int i = 0;
 	// while(thread_current()->children[i] != -1) i++;
 	// thread_current()->children[i] = child_pid;
+	if (child_pid == -1) return -1;
 	
 	int i = 0;
 	while(thread_current()->children[i] != -1 && i < 32) 
@@ -126,7 +128,7 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	struct thread* child = get_alive_by_tid(child_pid);
 	if (child->exit_code == -1){
 		thread_current()->children[i] = -1;
-		sema_up(&child->wait_sema);
+		sema_up(&child->exit_sema);
 		return -1;	
 	}	
 
@@ -148,6 +150,8 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page (parent->pml4, va);
+	if (parent_page == NULL)
+		return TID_ERROR;
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
@@ -166,7 +170,8 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
-		set_code_and_exit(-1);
+		// set_code_and_exit(-1);
+		return TID_ERROR;
 	}
 	return true;
 }
@@ -288,26 +293,33 @@ process_wait (tid_t child_tid UNUSED) {
 		if (thread_current()->children[i] == child_tid)
 		{
 			// struct thread* child = get_thread_by_tid(child_tid);
-
+			
 			// if (child) return -1;
 			// while(get_thread_by_tid(child_tid) == NULL){}
 			// else{
 			struct thread* child = get_alive_by_tid(child_tid);
+		
 			sema_down(&child->wait_sema);
+
+
 			// }
 			// printf("2\n");
 			// int exit_code = 0;
 			int exit_code = child->exit_code;
+			
 		
 			thread_current()->children[i] = -1;
+		
 			
 			sema_up(&child->exit_sema);
+			
 			// if (child)
 			// 	sema_up(&child->exit_sema);
 			// return get_thread_by_tid(child_tid)->exit_code;
 			return exit_code;
 		}
 	}
+
 	return -1;
 }
 
@@ -315,22 +327,34 @@ process_wait (tid_t child_tid UNUSED) {
 void
 process_exit (void) {
 	struct thread *curr = thread_current ();
+
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
+
 	if (curr->is_user){
 		printf ("%s: exit(%d)\n", curr->name, curr->exit_code);
 	}
 
+	// for (int i = 0; i<32; i++){
+	// 	if(curr->fd_table[i] != NULL)
+	// 		file_close(curr->fd_table[i]);
+	// }
 	if (curr->exec_file)
 		file_close(curr->exec_file);
 		// file_allow_write(thread_current()->exec_file);	
+
 	curr->exec_file = NULL;
+
+	for (int i = 3; i<32; i++){
+		if(curr->fd_table[i] != NULL)
+			file_close(curr->fd_table[i]);
+	}
 
 	// if (curr->parent->wait_sema != NULL)
 	sema_up(&curr->wait_sema);
-
+	
 	// if (thread_current()->parent->exit_sema != NULL)
 	sema_down(&curr->exit_sema);
 	// if (thread_current()->parent->wait_sema != NULL){
