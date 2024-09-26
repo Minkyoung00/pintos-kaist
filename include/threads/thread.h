@@ -7,11 +7,10 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 // #include "devices/timer.h"
+#define VM
 #ifdef VM
 #include "vm/vm.h"
 #endif
-
-#define USERPROG
 
 /* States in a thread's life cycle. */
 enum thread_status {

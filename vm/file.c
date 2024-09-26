@@ -44,6 +44,7 @@ file_backed_swap_out (struct page *page) {
 static void
 file_backed_destroy (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
+	palloc_free_page(file_page);
 }
 
 /* Do the mmap */

@@ -147,10 +147,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			f->R.rax = -1;
 		else
 		{
-			// int i = 0;
-			// while(thread_current()->fd_table[i] && i < 64) i ++;
-			// thread_current()->fd_table[i] = open_file;
-			
 			// 64->32 반영 안 해줘서 터짐
 			int i = 0;
 			while(thread_current()->fd_table[i] && i < 32) i++;
@@ -187,9 +183,10 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		void *buffer = f->R.rsi;
 		unsigned size = f->R.rdx;
 
-		if (!check_valid_fd(fd) || !check_valid_mem(buffer)){
+		// if (!check_valid_fd(fd) || !check_valid_mem(buffer)){
+		if (!check_valid_fd(fd)){
 			set_code_and_exit(-1);
-		} 
+		}
 
 		lock_acquire(&lock);
 

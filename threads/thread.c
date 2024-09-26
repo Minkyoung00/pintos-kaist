@@ -883,7 +883,7 @@ get_alive_by_tid (tid_t tid){
 		if (t->tid == tid)
 			return t;
 	}
-	// for (e =list_begin (&thread_current()->exit_sema->waiters); e != list_end (&thread_current()->exit_sema->waiters); e = list_next (e))
+	// for (e =list_begin (&thread_current()->exit_sema.waiters); e != list_end (&thread_current()->exit_sema.waiters); e = list_next (e))
 	// {
 	// 	t = list_entry(e, struct thread, elem);
 	// 	if (t->tid == tid)
