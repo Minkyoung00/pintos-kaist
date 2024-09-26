@@ -147,16 +147,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			f->R.rax = -1;
 		else
 		{
-			// 64->32 반영 안 해줘서 터짐
 			int i = 0;
-			while(thread_current()->fd_table[i] && i < 32) i++;
+			while(thread_current()->fd_table[i] && i < 64) i++;
 			if (thread_current()->fd_table[i] == NULL)
 				thread_current()->fd_table[i] = open_file;
-			else {
-				file_close(open_file);
-				f->R.rax = -1;
-				break;
-			}
+			// else printf("FD_TABLE IS FULL!!");
 
 			if (!strcmp(thread_current()->name, file_name))
 				file_deny_write(thread_current()->exec_file);
