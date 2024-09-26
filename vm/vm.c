@@ -63,6 +63,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		}
 		
 		/* TODO: Insert the page into the spt. */
+		new_page->writable = writable;
 		if (spt_insert_page(spt, new_page)){
 			return true;
 		};
@@ -170,10 +171,10 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
-	// printf("addr: %p\n",addr);
 
 	page = spt_find_page(spt, pg_round_down(addr));
 	if (page == NULL) return false; 
+	// printf("page: %p\n", page);
 
 	return vm_do_claim_page (page);
 }
@@ -208,7 +209,7 @@ vm_do_claim_page (struct page *page) {
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
-	pml4_set_page(thread_current()->pml4, page->va,frame->kva,true);
+	pml4_set_page(thread_current()->pml4, page->va,frame->kva,page->writable);
 
 	// struct supplemental_page_table *spt = &thread_current()->spt;
 	// spt_insert_page(spt,page);
@@ -243,14 +244,31 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
-	// struct hash_iterator i;
-	// hash_first (&i, &src->hash_table);
-	// while (hash_next (&i)) {
-	// 	struct page *p = hash_entry (hash_cur (&i), struct page, hash_elem);
-	// 	if (!spt_insert_page(dst, p)) 
-	// 		return false;
-	// }
-	// return true;
+	struct hash_iterator i;
+	hash_first (&i, &src->hash_table);
+	while (hash_next (&i)) {
+		struct page *p = hash_entry (hash_cur (&i), struct page, hash_elem);
+		enum vm_type type = page_get_type(p);
+		void *upage = p->va;
+		bool writable = p->writable;
+
+		vm_initializer *init;
+		void *aux;
+		if (type == VM_ANON || type == VM_FILE){
+			vm_alloc_page_with_initializer(type, upage, writable, NULL, NULL);
+			vm_claim_page(upage);
+			// for pass fork
+			struct page *find_page = spt_find_page(dst, upage);
+			memcpy(find_page->frame->kva, p->frame->kva, PGSIZE);
+		}
+		else{
+			init = &(p->uninit).init;
+			aux = &(p->uninit).aux;
+			vm_alloc_page_with_initializer(type, upage, writable, init, aux);
+			// vm_claim_page(upage);
+		}
+	}
+	return true;
 }
 
 /* Free the resource hold by the supplemental page table */
@@ -266,6 +284,7 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	// 	if (!spt_insert_page(dst, p)) 
 	// 		return false;
 	// }
+	/*===============================================*/
 	// struct hash *h = &spt->hash_table;
 	// size_t i;
 
@@ -286,5 +305,5 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 
 	// h->elem_cnt = 0;
 
-	return true;
+	// return ;
 }

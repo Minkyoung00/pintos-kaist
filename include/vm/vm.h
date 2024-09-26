@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "threads/palloc.h"
 #include <hash.h>
+#include <string.h>
 
 enum vm_type {
 	/* page not initialized */
@@ -48,7 +49,7 @@ struct page {
 
 	/* Your implementation */
 	// int present;
-	// int writable;
+	bool writable;
 	// void *swap_addr;
 	struct hash_elem hash_elem;
 
