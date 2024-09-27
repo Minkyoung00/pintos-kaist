@@ -77,7 +77,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			f->R.rax = -1;
 			break;
 		}
-
 		f->R.rax = process_fork(thread_name, f);
 		
 		break;
@@ -187,7 +186,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		if (!check_valid_fd(fd)){
 			set_code_and_exit(-1);
 		}
-
 		lock_acquire(&lock);
 
 		if (fd == 0) 
@@ -199,7 +197,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					= (struct file*)(thread_current()->fd_table[fd]);
 			f->R.rax = file_read(read_file, buffer, size);
 		}
-		lock_release(&lock);	
+		lock_release(&lock);
 		break;
 	}
 	case SYS_WRITE: {                /* Write to a file. */

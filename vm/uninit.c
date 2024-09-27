@@ -73,7 +73,7 @@ uninit_destroy (struct page *page) {
 	else if (type == VM_FILE){
 
 	}
-
-	palloc_free_page(uninit);
+	free(uninit->aux);
+	// free(uninit);
 	return;
 }

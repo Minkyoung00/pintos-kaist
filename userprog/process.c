@@ -120,7 +120,7 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	if (i < 32)
 		thread_current()->children[i] = child_pid;
 	else printf("CHILDREN LIST IS FULL!!");
-	 
+
 	sema_down(&thread_current()->fork_sema);	
 
 	struct thread* child = get_alive_by_tid(child_pid);

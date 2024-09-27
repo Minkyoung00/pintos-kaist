@@ -44,7 +44,7 @@ static struct frame *vm_evict_frame (void);
 bool
 vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		vm_initializer *init, void *aux) {
-
+	// printf("alloc page addr: %p\n", upage);
 	ASSERT (VM_TYPE(type) != VM_UNINIT)
 
 	struct supplemental_page_table *spt = &thread_current ()->spt;
@@ -174,7 +174,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 
 	page = spt_find_page(spt, pg_round_down(addr));
 	if (page == NULL) return false; 
-	// printf("page: %p\n", page);
+	// printf("page: %p\n", pg_round_down(addr));
 
 	return vm_do_claim_page (page);
 }
@@ -239,7 +239,14 @@ void
 supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 	hash_init(&spt->hash_table, page_hash, page_less, NULL);
 }
-
+struct info_binary{
+	struct file *file;
+	off_t ofs;
+	uint8_t *upage;
+	uint32_t read_bytes;
+	uint32_t zero_bytes;
+	bool writable;
+};
 /* Copy supplemental page table from src to dst */
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
@@ -248,28 +255,30 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 	hash_first (&i, &src->hash_table);
 	while (hash_next (&i)) {
 		struct page *p = hash_entry (hash_cur (&i), struct page, hash_elem);
-		enum vm_type type = page_get_type(p);
+		enum vm_type type = VM_TYPE(p->operations->type);
 		void *upage = p->va;
 		bool writable = p->writable;
 
-		vm_initializer *init;
-		void *aux;
 		if (type == VM_ANON || type == VM_FILE){
-			vm_alloc_page_with_initializer(type, upage, writable, NULL, NULL);
-			vm_claim_page(upage);
-			// for pass fork
+			vm_alloc_page_with_initializer(page_get_type(p), upage, writable, NULL, NULL);
+			/* for pass fork */
 			struct page *find_page = spt_find_page(dst, upage);
+			vm_do_claim_page(find_page);
 			memcpy(find_page->frame->kva, p->frame->kva, PGSIZE);
 		}
 		else{
-			init = &(p->uninit).init;
-			aux = &(p->uninit).aux;
-			vm_alloc_page_with_initializer(type, upage, writable, init, aux);
-			// vm_claim_page(upage);
+			vm_initializer *init = p->uninit.init;
+			void *aux = p->uninit.aux;
+
+			void *info = malloc(sizeof(struct info_binary));
+			memcpy(info, aux, sizeof(struct info_binary));
+
+			vm_alloc_page_with_initializer(page_get_type(p), upage, writable, init, info);
 		}
 	}
 	return true;
 }
+
 
 /* Free the resource hold by the supplemental page table */
 void
@@ -285,25 +294,29 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	// 		return false;
 	// }
 	/*===============================================*/
-	// struct hash *h = &spt->hash_table;
-	// size_t i;
+	struct hash *h = &spt->hash_table;
+	// hash_clear(h, NULL);
+	size_t i;
 
-	// for (i = 0; i < h->bucket_cnt; i++) {
-	// 	struct list *bucket = &h->buckets[i];
+	for (i = 0; i < h->bucket_cnt; i++) {
+		struct list *bucket = &h->buckets[i];
 
-	// 	while (!list_empty (bucket)) {
-	// 		struct list_elem *list_elem = list_pop_front (bucket);
-	// 		struct hash_elem *hash_elem = list_entry(list_elem, struct hash_elem, list_elem);
-	// 		struct page *page = hash_entry(hash_elem, struct page, hash_elem);
-	// 		(page->operations->destroy)(page);
+		while (!list_empty (bucket)) {
+			struct list_elem *list_elem = list_pop_front (bucket);
+			struct hash_elem *hash_elem = list_entry(list_elem, struct hash_elem, list_elem);
+			struct page *page = hash_entry(hash_elem, struct page, hash_elem);
+
+			// enum vm_type type = VM_TYPE(page->operations->type);
+			// printf("page->frame->kva: %p\n",page->frame->kva );
+			(page->operations->destroy)(page);
 			
-	// 		palloc_free_page(page);
-	// 	}
+			free(page);
+		}
 
-	// 	list_init (bucket);
-	// }
+		list_init (bucket);
+	}
 
-	// h->elem_cnt = 0;
+	h->elem_cnt = 0;
 
-	// return ;
+	return ;
 }
