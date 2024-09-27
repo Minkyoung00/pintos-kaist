@@ -2,9 +2,19 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
-// project 3
+// project 3 //////////////
 #include "kernel/hash.h"
 #include "threads/vaddr.h"
+struct aux_box
+{
+	uint32_t offs;
+	uint8_t *upage;
+	uint32_t read_bytes;
+	uint32_t zero_bytes;
+	bool writable;
+	struct file *file;
+};
+///////////////////////////
 
 enum vm_type
 {
@@ -49,7 +59,6 @@ struct page
 	const struct page_operations *operations;
 	void *va;			 /* Address in terms of user space */
 	struct frame *frame; /* Back reference for frame */
-
 	/* Your implementation */
 	// project 3
 	bool writable;
@@ -126,7 +135,11 @@ bool vm_claim_page(void *va);
 enum vm_type page_get_type(struct page *page);
 
 // project-3
-uint64_t page_hash(const struct hash_elem *e, void *aux);
+unsigned
+page_hash(const struct hash_elem *e, void *aux);
 bool page_less(const struct hash_elem *a, const struct hash_elem *b, void *aux);
+// struct page *page_lookup(const void *address, struct supplemental_page_table *spt);
+struct page *page_lookup(struct hash *h UNUSED, const void *address);
+void hash_page_destroy(struct hash_elem *e, void *aux);
 
 #endif /* VM_VM_H */
