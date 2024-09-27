@@ -13,14 +13,16 @@ Formatting file system...done.
 Boot complete.
 Putting 'exit' into the file system...
 Executing 'exit':
-is load?is spt null? 하이outside of findhow about here? 0 널Execution of 'exit' complete.
+(exit) begin
+exit: exit(57)
+Execution of 'exit' complete.
 Timer: 59 ticks
-Thread: 35 idle ticks, 24 kernel ticks, 0 user ticks
+Thread: 35 idle ticks, 24 kernel ticks, 1 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 39 reads, 232 writes
+hd0:1: 80 reads, 232 writes
 hd1:0: 102 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 932 characters output
+Console: 897 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...

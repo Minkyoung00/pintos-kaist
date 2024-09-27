@@ -82,12 +82,12 @@ initd (void *f_name) {
 #ifdef VM
 	supplemental_page_table_init (&thread_current ()->spt);
 #endif
-
 	process_init ();
-
+	
 	if (process_exec (f_name) < 0)
 		PANIC("Fail to launch initd\n");
 	NOT_REACHED ();
+	
 }
 
 struct fork_args {
@@ -257,12 +257,10 @@ process_exec (void *f_name) {
 
 	/* And then load the binary */
 	success = load (file_name, &_if);
-
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success)
 		return -1;
-
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -566,8 +564,10 @@ load (const char *file_name, struct intr_frame *if_) {
 	}
 
 	/* Set up stack. */
-	if (!setup_stack (if_))
+	if (!setup_stack (if_)){
+
 		goto done;
+		}
 
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
@@ -580,6 +580,8 @@ load (const char *file_name, struct intr_frame *if_) {
 		strlcpy((char*)if_->rsp, argv[i], strlen(argv[i])+1);
 		argv[i] = (char*)if_->rsp;
 	}
+	
+
 	
 	if_->rsp = ROUND_DOWN(if_->rsp, 8);
 
@@ -596,15 +598,16 @@ load (const char *file_name, struct intr_frame *if_) {
 	if_->R.rdi = argc;
 
 	success = true;
-
 	thread_current()->exec_file = file;
 	// file_deny_write(thread_current()->exec_file);
 
 done:
 	/* We arrive here whether the load is successful or not. */
 	// file_close (file);
-	if (!success)
-		file_close (file);
+	// if (!success){
+	// 	// file_close (file);
+	// 	}
+
 	return success;
 }
 
@@ -772,28 +775,23 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
-	struct file *file = ((struct info_binary*)aux)->file;
-	off_t ofs = ((struct info_binary*)aux)->ofs;
-	uint32_t read_bytes = ((struct info_binary *)aux)->read_bytes;
-	uint32_t zero_bytes = ((struct info_binary *)aux)->zero_bytes;
-	bool writable = ((struct info_binary *)aux)->writable;
 	
-	printf("is lazy_load?");
+	struct info_binary *info = (struct info_binary *)aux;
 
-	file_seek(file, ofs);
+	file_seek(info->file, info->ofs);
 
-	size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-    size_t page_zero_bytes = PGSIZE - page_read_bytes;
+	// size_t page_read_bytes = info->read_bytes < PGSIZE ? info->read_bytes : PGSIZE;
+    // size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 	 /* 페이지 메모리 영역에 파일 내용을 읽음 */
-    if (file_read(file, page->frame->kva, page_read_bytes) != (int) page_read_bytes) {
+    if (file_read(info->file, page->frame->kva, info->read_bytes) != (int) info->read_bytes) {
         /* 읽기 실패 시 페이지 할당 해제 및 실패 반환 */
         palloc_free_page(page->frame->kva);
         return false;
     }
 
     /* 남은 영역을 0으로 채움 */
-    memset(page->frame->kva + page_read_bytes, 0, page_zero_bytes);
+    memset(page->frame->kva + info->read_bytes, 0, info->zero_bytes);
 
 	return true;
 }
@@ -826,7 +824,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
-		void *aux = NULL;
+	
 		struct info_binary *info = malloc(sizeof(struct info_binary));
 		info->file = file;
 		info->ofs = ofs;
@@ -834,12 +832,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		info->read_bytes = page_read_bytes;
 		info->zero_bytes = page_zero_bytes;
 		info->writable = writable;
-		aux = info;
-		printf("is load?");
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, aux))
+					writable, lazy_load_segment, info))
 			return false;
-		printf("is load?");
 		/* Advance. */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
@@ -859,9 +854,7 @@ setup_stack (struct intr_frame *if_) {
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
-
 	vm_alloc_page_with_initializer(VM_ANON | VM_MARKER_0, stack_bottom, true, NULL, NULL);
-
 	if(vm_claim_page(stack_bottom))
 	{
 		if_->rsp = USER_STACK;

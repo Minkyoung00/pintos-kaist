@@ -96,7 +96,7 @@ struct supplemental_page_table {
 	
 	// struct page* page;
 	// 해쉬에 이어서 뭘 담아야 하지?
-	struct hash* hash; // 기존 페이지 테이블을 담아야 함.. 키 : 페이지넘버/벨류 : 페이지 값
+	struct hash hash; // 기존 페이지 테이블을 담아야 함.. 키 : 페이지넘버/벨류 : 페이지 값
 
 };
 

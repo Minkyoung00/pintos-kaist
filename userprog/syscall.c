@@ -297,7 +297,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 bool 
 check_valid_mem(void* ptr){
-	if (ptr == NULL || !is_user_vaddr (ptr) || pml4_get_page(thread_current()->pml4, ptr) == NULL)
+	if (ptr == NULL || !is_user_vaddr (ptr))
 		return false;
 	return true;
 }
