@@ -2,6 +2,7 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
+#include "lib/kernel/hash.h"
 
 enum vm_type {
 	/* page not initialized */
@@ -46,7 +47,9 @@ struct page {
 	struct frame *frame;   /* Back reference for frame */
 
 	/* Your implementation */
+	struct hash_elem hash_elem;
 
+	bool wrt;
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
 	union {
@@ -63,6 +66,8 @@ struct page {
 struct frame {
 	void *kva;
 	struct page *page;
+
+	struct list_elem frame_elem;
 };
 
 /* The function table for page operations.
@@ -84,7 +89,15 @@ struct page_operations {
 /* Representation of current process's memory space.
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
+
+// 페이지 펄트 헨들러와 함깨 펄트가 일어났을때 대처하기 위한 페이지
+// 포맷을 지켜야하는 페이지테이블과는 다르게 모든 정보를 가지고 있어야 함
 struct supplemental_page_table {
+	
+	// struct page* page;
+	// 해쉬에 이어서 뭘 담아야 하지?
+	struct hash* hash; // 기존 페이지 테이블을 담아야 함.. 키 : 페이지넘버/벨류 : 페이지 값
+
 };
 
 #include "threads/thread.h"

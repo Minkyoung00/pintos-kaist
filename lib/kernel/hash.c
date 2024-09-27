@@ -8,6 +8,7 @@
 #include "hash.h"
 #include "../debug.h"
 #include "threads/malloc.h"
+#include "../../include/vm/vm.h"
 
 #define list_elem_to_hash_elem(LIST_ELEM)                       \
 	list_entry(LIST_ELEM, struct hash_elem, list_elem)
@@ -30,7 +31,6 @@ hash_init (struct hash *h,
 	h->hash = hash;
 	h->less = less;
 	h->aux = aux;
-
 	if (h->buckets != NULL) {
 		hash_clear (h, NULL);
 		return true;
@@ -47,6 +47,7 @@ hash_init (struct hash *h,
    functions hash_clear(), hash_destroy(), hash_insert(),
    hash_replace(), or hash_delete(), yields undefined behavior,
    whether done in DESTRUCTOR or elsewhere. */
+   
 void
 hash_clear (struct hash *h, hash_action_func *destructor) {
 	size_t i;
@@ -121,6 +122,8 @@ hash_replace (struct hash *h, struct hash_elem *new) {
    null pointer if no equal element exists in the table. */
 struct hash_elem *
 hash_find (struct hash *h, struct hash_elem *e) {
+
+	printf("outside of find");
 	return find_elem (h, find_bucket (h, e), e);
 }
 
@@ -240,6 +243,7 @@ hash_empty (struct hash *h) {
 #define FNV_64_BASIS 0xcbf29ce484222325UL
 
 /* Returns a hash of the SIZE bytes in BUF. */
+
 uint64_t
 hash_bytes (const void *buf_, size_t size) {
 	/* Fowler-Noll-Vo 32-bit hash, for bytes. */
@@ -279,7 +283,12 @@ hash_int (int i) {
 /* Returns the bucket in H that E belongs in. */
 static struct list *
 find_bucket (struct hash *h, struct hash_elem *e) {
+
+	printf("how about here? %d ", h->bucket_cnt);
+	if (h->hash == NULL) printf("널");
 	size_t bucket_idx = h->hash (e, h->aux) & (h->bucket_cnt - 1);
+	printf("Bucket index: %zu\n", bucket_idx);
+	
 	return &h->buckets[bucket_idx];
 }
 
@@ -287,13 +296,17 @@ find_bucket (struct hash *h, struct hash_elem *e) {
    it if found or a null pointer otherwise. */
 static struct hash_elem *
 find_elem (struct hash *h, struct list *bucket, struct hash_elem *e) {
+	printf("gdgd");
 	struct list_elem *i;
-
+	
 	for (i = list_begin (bucket); i != list_end (bucket); i = list_next (i)) {
 		struct hash_elem *hi = list_elem_to_hash_elem (i);
-		if (!h->less (hi, e, h->aux) && !h->less (e, hi, h->aux))
+		if (!h->less (hi, e, h->aux) && !h->less (e, hi, h->aux)){
+			printf("inside if");
 			return hi;
+			}
 	}
+	printf("return NULL");
 	return NULL;
 }
 

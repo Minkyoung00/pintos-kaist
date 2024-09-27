@@ -266,6 +266,7 @@ pml4_clear_page (uint64_t *pml4, void *upage) {
  * that is, if the page has been modified since the PTE was
  * installed.
  * Returns false if PML4 contains no PTE for VPAGE. */
+
 bool
 pml4_is_dirty (uint64_t *pml4, const void *vpage) {
 	uint64_t *pte = pml4e_walk (pml4, (uint64_t) vpage, false);
@@ -274,6 +275,7 @@ pml4_is_dirty (uint64_t *pml4, const void *vpage) {
 
 /* Set the dirty bit to DIRTY in the PTE for virtual page VPAGE
  * in PML4. */
+
 void
 pml4_set_dirty (uint64_t *pml4, const void *vpage, bool dirty) {
 	uint64_t *pte = pml4e_walk (pml4, (uint64_t) vpage, false);
@@ -292,6 +294,7 @@ pml4_set_dirty (uint64_t *pml4, const void *vpage, bool dirty) {
  * accessed recently, that is, between the time the PTE was
  * installed and the last time it was cleared.  Returns false if
  * PML4 contains no PTE for VPAGE. */
+
 bool
 pml4_is_accessed (uint64_t *pml4, const void *vpage) {
 	uint64_t *pte = pml4e_walk (pml4, (uint64_t) vpage, false);
@@ -300,6 +303,7 @@ pml4_is_accessed (uint64_t *pml4, const void *vpage) {
 
 /* Sets the accessed bit to ACCESSED in the PTE for virtual page
    VPAGE in PD. */
+
 void
 pml4_set_accessed (uint64_t *pml4, const void *vpage, bool accessed) {
 	uint64_t *pte = pml4e_walk (pml4, (uint64_t) vpage, false);

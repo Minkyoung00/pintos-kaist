@@ -73,6 +73,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	case SYS_FORK:                   /* Clone current process. */
 	{
 		char *thread_name = f->R.rdi;
+		
 		if (!check_valid_mem(thread_name)) {
 			f->R.rax = -1;
 			break;
@@ -209,7 +210,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		int fd = f->R.rdi;
 		void *buffer = f->R.rsi;
 		unsigned size = f->R.rdx;
-		
 		if (!check_valid_mem(buffer) || !check_valid_fd(fd)){
 			set_code_and_exit(-1);
 		} 

@@ -35,6 +35,7 @@ struct hash_elem {
  * name of the outer structure STRUCT and the member name MEMBER
  * of the hash element.  See the big comment at the top of the
  * file for an example. */
+
 #define hash_entry(HASH_ELEM, STRUCT, MEMBER)                   \
 	((STRUCT *) ((uint8_t *) &(HASH_ELEM)->list_elem        \
 		- offsetof (STRUCT, MEMBER.list_elem)))
@@ -97,4 +98,6 @@ uint64_t hash_bytes (const void *, size_t);
 uint64_t hash_string (const char *);
 uint64_t hash_int (int);
 
+// int page_hash(struct hash_elem* e);
+// bool page_less(const struct hash_elem* a, const struct hash_elem* b, void *aux);
 #endif /* lib/kernel/hash.h */
