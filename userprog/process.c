@@ -809,19 +809,26 @@ lazy_load_segment(struct page *page, void *aux)
 	struct file *file = auxx->file;
 	bool writable = auxx->writable;
 
+	// 파일에서 데이터를 읽어올 위치를 ofs를 사용해서 설정한다.
+	// 즉, 파일의 어느 부분에서 데이터를 읽을지 결정한다.
 	file_seek(file, ofs);
-	size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-	size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 	page->va = upage;
 	page->writable = writable;
 
-	if (file_read(file, page->frame->kva, page_read_bytes) != (int)page_read_bytes)
+	// 파일에서 데이터를 읽어와 메모리에 저장한다.
+	// 파일에서 read_bytes만큼의 데이터를 읽어와 페이지의 프레임이
+	// 가리키는 실제 메모리 공간(kva,커널 가상주소)에 저장한다.
+	// 만약 읽어온 바이트 수가 read_bytes외 일치하지 않으면,
+	// 페이지 로드에 실패했음을 의미하므로 false반환후 종료.
+	if (file_read(file, page->frame->kva, read_bytes) != read_bytes)
 	{
 		palloc_free_page(page);
 		return false;
 	}
-	memset(page->frame->kva + page_read_bytes, 0, page_zero_bytes);
+	// 파일에서 읽은 데이터 외의 남은 페이지 부분을 0으로 채운다.
+	// 이 작업을 하는 이유: 페이지를 초기화하기 위해서.
+	memset(page->frame->kva + read_bytes, 0, zero_bytes);
 
 	return true;
 
@@ -847,21 +854,26 @@ static bool
 load_segment(struct file *file, off_t ofs, uint8_t *upage,
 			 uint32_t read_bytes, uint32_t zero_bytes, bool writable)
 {
+	// read_bytes + zero_bytes이 pgsize(4kb)의 배수인지.
 	ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
+	// upage가 페이지 경계에 정렬되어 있는지 확인
 	ASSERT(pg_ofs(upage) == 0);
+	// 파일 오프셋이 페이지 크기의 배수인지 확인한다.
 	ASSERT(ofs % PGSIZE == 0);
 
+	// 매번 페이지 크기만큼 데이터를 로드한다.
 	while (read_bytes > 0 || zero_bytes > 0)
 	{
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
 		 * and zero the final PAGE_ZERO_BYTES bytes. */
+		// 파일에서 읽어올 데이터와 0으로 채울 데이터를 계산한다.
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
 		// project 3
-		// void *aux = NULL;
+		// aux에 넘겨야할 정보를 담아서 전달.
 		void *aux = NULL;
 		struct aux_box *auxx = malloc(sizeof(struct aux_box));
 		auxx->file = file;
@@ -871,7 +883,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 		auxx->zero_bytes = page_zero_bytes;
 		auxx->writable = writable;
 		aux = auxx;
-
+		// 페이지를 할당하고 해당 페이지가 팔요할 때 lazy_load_segment에서 파일 데이터를 로드할 수 있도록.
 		if (!vm_alloc_page_with_initializer(VM_ANON, upage,
 											writable, lazy_load_segment, aux))
 		{

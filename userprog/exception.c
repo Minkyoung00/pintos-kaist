@@ -150,7 +150,12 @@ page_fault(struct intr_frame *f)
 		return;
 #endif
 	// project 3 ./////////////////////////////////////////
-	// if (not_present || user)
+	// 존재하지 않는 페이지거나, 유저가 접근했을 때.
+	if (not_present || user)
+	{
+		set_code_and_exit(-1);
+	}
+	// if ((!not_present && write) || (fault_addr < 0x400000 || fault_addr >= USER_STACK))
 	// {
 	// 	set_code_and_exit(-1);
 	// }

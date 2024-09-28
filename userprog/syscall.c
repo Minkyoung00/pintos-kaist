@@ -74,6 +74,8 @@ void syscall_handler(struct intr_frame *f UNUSED)
 	case SYS_FORK: /* Clone current process. */
 	{
 		char *thread_name = f->R.rdi;
+		// project3 조건을 수정해줘야 하니? @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
 		if (!check_valid_mem(thread_name))
 		{
 			f->R.rax = -1;
@@ -95,14 +97,17 @@ void syscall_handler(struct intr_frame *f UNUSED)
 			return TID_ERROR;
 		strlcpy(fn_copy, file, PGSIZE);
 
-		if (thread_current()->exec_file != NULL)
-			file_close(thread_current()->exec_file);
-		// file_allow_write(thread_current()->exec_file);
+		// project 3 함 지워 볼까 ////////////////
+		// if (thread_current()->exec_file != NULL)
+		// 	file_close(thread_current()->exec_file);
+		file_allow_write(thread_current()->exec_file);
 		thread_current()->exec_file = NULL;
 
+		// 얘도 모가지 함 따보자 /////////////////////
 		if (process_exec(fn_copy) < 0)
 		{
 			f->R.rax = -1;
+			// 여기
 			set_code_and_exit(-1);
 		}
 		break;
@@ -125,6 +130,7 @@ void syscall_handler(struct intr_frame *f UNUSED)
 			f->R.rax = filesys_create(file, initial_size);
 
 		else
+			// 여기
 			set_code_and_exit(-1);
 
 		break;
@@ -145,6 +151,7 @@ void syscall_handler(struct intr_frame *f UNUSED)
 	{ /* Open a file. */
 		char *file_name = f->R.rdi;
 		if (!check_valid_mem(file_name))
+			// 여기
 			set_code_and_exit(-1);
 
 		struct file *open_file = filesys_open(file_name);
@@ -197,6 +204,7 @@ void syscall_handler(struct intr_frame *f UNUSED)
 
 		if (!check_valid_fd(fd) || !check_valid_mem(buffer))
 		{
+			// 여기
 			set_code_and_exit(-1);
 		}
 
@@ -221,6 +229,7 @@ void syscall_handler(struct intr_frame *f UNUSED)
 
 		if (!check_valid_mem(buffer) || !check_valid_fd(fd))
 		{
+			// 여기
 			set_code_and_exit(-1);
 		}
 
@@ -306,7 +315,8 @@ void syscall_handler(struct intr_frame *f UNUSED)
 
 bool check_valid_mem(void *ptr)
 {
-	if (ptr == NULL || !is_user_vaddr(ptr) || pml4_get_page(thread_current()->pml4, ptr) == NULL)
+	// if에 빼줬어  || pml4_get_page(thread_current()->pml4, ptr) == NULL
+	if (ptr == NULL || !is_user_vaddr(ptr))
 		return false;
 	return true;
 }

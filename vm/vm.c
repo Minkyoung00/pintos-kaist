@@ -273,17 +273,6 @@ void supplemental_page_table_init(struct supplemental_page_table *spt UNUSED)
 	hash_init(&spt->hash_table, page_hash, page_less, NULL);
 }
 
-// struct page *page_lookup(const void *address, struct supplemental_page_table *spt UNUSED)
-// {
-// 	struct page p;
-// 	// struct hash_elem *e = spt->hash_table;
-
-// 	p.va = address;
-// 	printf("나오려나 \n");
-// 	struct hash_elem *e = hash_find(&spt->hash_table, &p.hash_elem);
-// 	return e != NULL ? hash_entry(e, struct page, hash_elem) : NULL;
-// }
-
 struct page *
 page_lookup(struct hash *h UNUSED, const void *address)
 {
