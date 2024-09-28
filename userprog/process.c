@@ -800,7 +800,6 @@ lazy_load_segment (struct page *page, void *aux) {
 			return false;
 		}
 		memset (page->frame->kva + page_read_bytes, 0, page_zero_bytes);
-
 		/* Add the page to the process's address space. */
 		// struct supplemental_page_table *spt = &thread_current()->spt;
 		// if (!spt_insert_page(spt, page)) {
@@ -808,6 +807,7 @@ lazy_load_segment (struct page *page, void *aux) {
 		// 	palloc_free_page (page);
 		// 	return false;
 		// }
+		// page->writable = false;
 	
 		/* Advance. */
 		// read_bytes -= page_read_bytes;
@@ -887,9 +887,10 @@ setup_stack (struct intr_frame *if_) {
 
 	if (vm_claim_page(stack_bottom)){
 		if_->rsp = USER_STACK;
-		thread_current()->rsp = USER_STACK;
+		thread_current()->stack_bottom = stack_bottom;
 		success = true;
 	}
+	// printf("setup_stack: %p\n", stack_bottom);
 	return success;
 }
 #endif /* VM */

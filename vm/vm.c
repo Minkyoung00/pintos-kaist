@@ -162,13 +162,14 @@ vm_stack_growth (void *addr UNUSED) {
 	// 	thread_exit();
 	// }
 	
-	// printf("cur_rsp: %p\n",stack_bottom );
-	while (stack_bottom + PGSIZE != thread_current()->rsp){
+	while (stack_bottom != thread_current()->stack_bottom){
+		// printf("stack_bottom: %p\n",stack_bottom);
 		vm_alloc_page_with_initializer(VM_ANON | VM_MARKER_0, stack_bottom, true, NULL, NULL);
 		vm_claim_page(stack_bottom);
 		stack_bottom += PGSIZE;
 		// thread_current()->rsp = addr;
 	} 
+	thread_current()->stack_bottom = stack_bottom;
 }
 
 /* Handle the fault on write_protected page */
@@ -189,7 +190,6 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	page = spt_find_page(spt, pg_round_down(addr));
 	if (page == NULL) 
 	{
-	
 		if (write && user && is_stack_addr(addr)){
 		// if (write && user && USER_STACK > addr  && addr > USER_STACK-256*PGSIZE){
 		// if (write && user && is_user_vaddr(addr) && is_user_vaddr(pg_round_down(addr))){
@@ -200,6 +200,8 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		return false; 
 	}
 
+	/* 읽기 시도이고 page writable이 false면 */
+	if(write && !page->writable) return false;
 	
 	return vm_do_claim_page (page);
 }
