@@ -887,11 +887,9 @@ setup_stack (struct intr_frame *if_) {
 
 	if (vm_claim_page(stack_bottom)){
 		if_->rsp = USER_STACK;
+		thread_current()->rsp = USER_STACK;
 		success = true;
-		// struct page* stack_page = spt_find_page(&thread_current()->spt, stack_bottom);
-		// stack_page->type_stack = VM_MARKER_0;
 	}
-
 	return success;
 }
 #endif /* VM */

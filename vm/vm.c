@@ -156,6 +156,19 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
+	void *stack_bottom = addr - PGSIZE;
+	// if (!is_user_vaddr (stack_bottom)) {
+	// 	thread_current()->exit_code = -1;
+	// 	thread_exit();
+	// }
+	
+	// printf("cur_rsp: %p\n",stack_bottom );
+	while (stack_bottom + PGSIZE != thread_current()->rsp){
+		vm_alloc_page_with_initializer(VM_ANON | VM_MARKER_0, stack_bottom, true, NULL, NULL);
+		vm_claim_page(stack_bottom);
+		stack_bottom += PGSIZE;
+		// thread_current()->rsp = addr;
+	} 
 }
 
 /* Handle the fault on write_protected page */
@@ -163,6 +176,7 @@ static bool
 vm_handle_wp (struct page *page UNUSED) {
 }
 
+#define is_stack_addr(vaddr) ((uint64_t)(vaddr) <= USER_STACK && (uint64_t)(vaddr) >= USER_STACK-256*PGSIZE)
 /* Return true on success */
 bool
 vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
@@ -171,11 +185,22 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
-
-	page = spt_find_page(spt, pg_round_down(addr));
-	if (page == NULL) return false; 
 	// printf("page: %p\n", pg_round_down(addr));
+	page = spt_find_page(spt, pg_round_down(addr));
+	if (page == NULL) 
+	{
+	
+		if (write && user && is_stack_addr(addr)){
+		// if (write && user && USER_STACK > addr  && addr > USER_STACK-256*PGSIZE){
+		// if (write && user && is_user_vaddr(addr) && is_user_vaddr(pg_round_down(addr))){
+		// if (write && user && is_user_vaddr(addr) && is_user_vaddr(pg_round_up(addr)-PGSIZE)){
+			vm_stack_growth(pg_round_up(addr));
+			return true;
+		}
+		return false; 
+	}
 
+	
 	return vm_do_claim_page (page);
 }
 
@@ -209,7 +234,12 @@ vm_do_claim_page (struct page *page) {
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
+	// if (is_user_vaddr (page->va))
 	pml4_set_page(thread_current()->pml4, page->va,frame->kva,page->writable);
+	// else {
+	// 	thread_current()->exit_code = -1;
+	// 	thread_exit();
+	// }
 
 	// struct supplemental_page_table *spt = &thread_current()->spt;
 	// spt_insert_page(spt,page);
