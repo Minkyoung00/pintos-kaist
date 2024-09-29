@@ -88,7 +88,7 @@ struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function. */
-	page = page_lookup(&spt->hash_table, va);
+	page = page_lookup(&spt->hash_table, pg_round_down(va));
 
 	return page;
 }
@@ -187,10 +187,18 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
 	// printf("page: %p\n", pg_round_down(addr));
-	page = spt_find_page(spt, pg_round_down(addr));
+	page = spt_find_page(spt, addr);
 	if (page == NULL) 
 	{
-		if (write && user && is_stack_addr(addr)){
+		uintptr_t cur_rsp;
+		if (user)
+			cur_rsp = f->rsp;
+		else
+			cur_rsp = thread_current()->rsp;
+
+		// printf("cur_rsp: %p\n", cur_rsp);
+
+		if (write && is_stack_addr(addr) && addr <= cur_rsp){
 		// if (write && user && USER_STACK > addr  && addr > USER_STACK-256*PGSIZE){
 		// if (write && user && is_user_vaddr(addr) && is_user_vaddr(pg_round_down(addr))){
 		// if (write && user && is_user_vaddr(addr) && is_user_vaddr(pg_round_up(addr)-PGSIZE)){
@@ -199,9 +207,11 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		}
 		return false; 
 	}
-
-	/* 읽기 시도이고 page writable이 false면 */
-	if(write && !page->writable) return false;
+	else{
+		// printf("%d\n", spt_find_page(&thread_current()->spt, page->va)->operations->type & (VM_ANON | VM_MARKER_0));
+		/* 읽기 시도이고 page writable이 false면 */
+		if(write && !page->writable) return false;
+	}
 	
 	return vm_do_claim_page (page);
 }
@@ -245,7 +255,7 @@ vm_do_claim_page (struct page *page) {
 
 	// struct supplemental_page_table *spt = &thread_current()->spt;
 	// spt_insert_page(spt,page);
-
+	// printf("alloc page: %p\n", page->va);
 	return swap_in (page, frame->kva);
 }
 
@@ -292,7 +302,8 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		bool writable = p->writable;
 
 		if (type == VM_ANON || type == VM_FILE){
-			vm_alloc_page_with_initializer(page_get_type(p), upage, writable, NULL, NULL);
+			// vm_alloc_page_with_initializer(page_get_type(p), upage, writable, NULL, NULL);
+			vm_alloc_page_with_initializer(p->uninit.type, upage, writable, NULL, NULL);
 			/* for pass fork */
 			struct page *find_page = spt_find_page(dst, upage);
 			vm_do_claim_page(find_page);
@@ -305,7 +316,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 			void *info = malloc(sizeof(struct info_binary));
 			memcpy(info, aux, sizeof(struct info_binary));
 
-			vm_alloc_page_with_initializer(page_get_type(p), upage, writable, init, info);
+			vm_alloc_page_with_initializer(p->uninit.type, upage, writable, init, info);
 		}
 	}
 	return true;

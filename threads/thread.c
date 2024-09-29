@@ -679,6 +679,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 #endif
 #ifdef VM
 	t->stack_bottom = NULL;
+	t->rsp = NULL;
 #endif
 }
 

@@ -17,6 +17,10 @@
 #include "userprog/process.h"
 #include "threads/synch.h"
 
+#ifdef VM
+#include "vm/vm.h"
+#endif
+
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 void set_code_and_exit(int exit_code);
@@ -184,6 +188,17 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 		// if (!check_valid_fd(fd) || !check_valid_mem(buffer)){
 		if (!check_valid_fd(fd)){
+			set_code_and_exit(-1);
+		}
+
+		// printf("buffer: %p\n", buffer);
+		// printf("pyshical address: %p\n", pml4_get_page(thread_current()->pml4, buffer));
+		// printf("is stack? : %d\n",(spt_find_page(&thread_current()->spt, buffer)->uninit.type) & VM_MARKER_0);
+		// printf("is stack? : %d\n",spt_find_page(&thread_current()->spt, buffer)->operations->type);
+		// if (pml4_get_page(thread_current()->pml4, buffer)
+		// 	&& !(spt_find_page(&thread_current()->spt, buffer)->uninit.type & VM_MARKER_0)){
+		if (pml4_get_page(thread_current()->pml4, buffer)
+			&& !(spt_find_page(&thread_current()->spt, buffer)->writable)){
 			set_code_and_exit(-1);
 		}
 		lock_acquire(&lock);

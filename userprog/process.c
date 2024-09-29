@@ -884,12 +884,14 @@ setup_stack (struct intr_frame *if_) {
 	/* TODO: Your code goes here */
 	
 	vm_alloc_page_with_initializer(VM_ANON | VM_MARKER_0, stack_bottom, true, NULL, NULL);
-
+	// printf("%d\n",(spt_find_page(&thread_current()->spt, stack_bottom)->uninit.type) & VM_MARKER_0);
 	if (vm_claim_page(stack_bottom)){
 		if_->rsp = USER_STACK;
 		thread_current()->stack_bottom = stack_bottom;
 		success = true;
 	}
+	// printf("%d\n",(spt_find_page(&thread_current()->spt, stack_bottom)->operations->type) | VM_MARKER_0);
+	// printf("%d\n", spt_find_page(&thread_current()->spt, stack_bottom)->operations->type);
 	// printf("setup_stack: %p\n", stack_bottom);
 	return success;
 }
