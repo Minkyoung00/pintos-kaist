@@ -6,6 +6,8 @@
 // project 3
 // #include "kernel/hash.h"
 #include "threads/mmu.h"
+#include "lib/string.h"
+#include "vm/uninit.h"
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -164,29 +166,23 @@ vm_get_frame(void)
 	ASSERT(frame != NULL);
 	ASSERT(frame->page == NULL);
 	return frame;
-	// struct frame *frame = NULL;
-	// /* TODO: Fill this function. */
-	// void *kpage = palloc_get_page(PAL_USER);
-	// if (kpage)
-	// {
-	// 	frame = malloc(sizeof(struct frame));
-	// 	frame->kva = kpage;
-	// 	frame->page = NULL;
-	// }
-	// else
-	// {
-	// 	PANIC("todo");
-	// }
-
-	// ASSERT(frame != NULL);
-	// ASSERT(frame->page == NULL);
-	// return frame;
 }
 
 /* Growing the stack. */
 static void
 vm_stack_growth(void *addr UNUSED)
 {
+	void *stack_p = thread_current()->tf.rsp;
+	struct supplemental_page_table *spt = &thread_current()->spt;
+	while (addr < stack_p)
+	{
+		// anon 페이지를 할당하면서 스택을 늘려주되, 그 단위는 PGSIZE요, 할당하는 횟수는 한번 이상이네.
+		// 어떻게 하니
+		// vm_alloc_page(VM_ANON,stack_p,true);
+		struct page *new_page = malloc(PGSIZE);
+		uninit_new(new_page, stack_p, NULL, VM_ANON, NULL, anon_initializer);
+		spt_insert_page(spt, new_page);
+	}
 }
 
 /* Handle the fault on write_protected page */
@@ -203,13 +199,27 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
-
-	page = spt_find_page(spt, pg_round_down(addr));
+	void *stack_addr = pg_round_down(addr);
+	page = spt_find_page(spt, stack_addr);
 	if (page == NULL)
+	{
 		return false;
+	}
 	// printf("page: %p\n", page);
-
-	return vm_do_claim_page(page);
+	// LOADER_PHYS_BASE;
+	// if (user)
+	// {
+	// 	stack_addr = f->rsp;
+	// }
+	// else
+	// {
+	// 	stack_addr = thread_current()->tf.rsp;
+	// }
+	// if (f->rsp >= addr)
+	// {
+	// 	vm_stack_growth(addr);
+	// }
+	return vm_do_claim_page(page); // hell
 }
 
 /* Free the page.
@@ -296,34 +306,52 @@ void hash_page_destroy(struct hash_elem *e, void *aux)
 bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED,
 								  struct supplemental_page_table *src UNUSED)
 {
-	// 	struct hash_iterator i;
-	// 	hash_first(&i, &src->hash_table);
-	// 	while (hash_next(&i))
-	// 	{
-	// 		struct page *p = hash_entry(hash_cur(&i), struct page, hash_elem);
-	// 		enum vm_type type = page_get_type(p);
-	// 		void *upage = p->va;
-	// 		bool writable = p->writable;
+	// src에서 dst로 spt를 복사해라.
+	// 이것은 자식이 부모의 실행 context를 상속할 필요가 있을 때 사용된다(for example.... fork()).
+	// src의 spt를 반복하면서 dst의 spt의 엔트리의 정확한 복사본을 만들어라.
+	// 초기화되지 않은(uninit) 페이지를 할당하고 그것들을 바로 요청해야 한다.
+	// page를 찾는 방법은 hash함수를 사용해서 elem을 찾아보자 -> 깃북 참고.s
 
-	// 		vm_initializer *init;
-	// 		void *aux;
-	// 		if (type == VM_ANON || type == VM_FILE)
-	// 		{
-	// 			vm_alloc_page_with_initializer(type, upage, writable, NULL, NULL);
-	// 			vm_claim_page(upage);
-	// 			// for pass fork
-	// 			struct page *find_page = spt_find_page(dst, upage);
-	// 			memcpy(find_page->frame->kva, p->frame->kva, PGSIZE);
-	// 		}
-	// 		else
-	// 		{
-	// 			init = &(p->uninit).init;
-	// 			aux = &(p->uninit).aux;
-	// 			vm_alloc_page_with_initializer(type, upage, writable, init, aux);
-	// 			// vm_claim_page(upage);
-	// 		}
-	// 	}
-	// 	return true;
+	struct hash_iterator i;
+	// hash_table을 순회하기 위해 i를 초기화 한다.
+	// 그뒤 구조체 i에 저장된 정보들을 쓰면 될듯?
+	hash_first(&i, &src->hash_table);
+	while (hash_next(&i))
+	{
+		struct page *page = hash_entry(hash_cur(&i), struct page, hash_elem);
+		enum vm_type file_type = page->operations->type;
+
+		// VM_TYPE(type) == VM_ANON
+		if (file_type == VM_ANON || file_type == VM_FILE)
+		{
+			// struct frame *frame = vm_get_frame();
+			// vm_alloc_page_with_initializer(page->uninit.type, page->va, page->writable, NULL, NULL);
+			vm_alloc_page(file_type, page->va, page->writable);
+
+			// hash_insert(&dst->hash_table, hash_cur(&i));
+			spt_insert_page(dst, page);
+			struct page *son_page = spt_find_page(dst, page->va);
+			// 메모리에 적재.
+			vm_do_claim_page(son_page);
+
+			// 물리 메모리의 실제 주소를 복사해야 하기 떄문이다.
+			// 프레임 주소를 사용하여 복사해야 가상 메모리 페이지에 매핑된 물리 메모리의 실제 데이터가 복사됨.
+			memcpy(son_page->frame->kva, page->frame->kva, PGSIZE);
+			// memcpy(son_page->va, page->va, PGSIZE);
+		}
+		else
+		{
+			// set aux
+			void *auxx = malloc(sizeof(struct aux_box));
+			memcpy(auxx, page->uninit.aux, sizeof(struct aux_box));
+
+			// spt_insert_page(dst, page);
+			// struct page *son_page = spt_find_page(dst, page->va);
+			// son_page->uninit.aux = auxx;
+			vm_alloc_page_with_initializer(page->uninit.type, page->va, page->writable, page->uninit.init, auxx);
+		}
+	}
+	return true;
 }
 
 /* Free the resource hold by the supplemental page table */

@@ -74,7 +74,6 @@ void syscall_handler(struct intr_frame *f UNUSED)
 	case SYS_FORK: /* Clone current process. */
 	{
 		char *thread_name = f->R.rdi;
-		// project3 조건을 수정해줘야 하니? @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 		if (!check_valid_mem(thread_name))
 		{
@@ -98,9 +97,11 @@ void syscall_handler(struct intr_frame *f UNUSED)
 		strlcpy(fn_copy, file, PGSIZE);
 
 		// project 3 함 지워 볼까 ////////////////
-		// if (thread_current()->exec_file != NULL)
-		// 	file_close(thread_current()->exec_file);
-		file_allow_write(thread_current()->exec_file);
+		if (thread_current()->exec_file != NULL)
+			file_close(thread_current()->exec_file);
+
+		// 이거 지우니까 14개 통과되는데?
+		// file_allow_write(thread_current()->exec_file);
 		thread_current()->exec_file = NULL;
 
 		// 얘도 모가지 함 따보자 /////////////////////
@@ -178,6 +179,7 @@ void syscall_handler(struct intr_frame *f UNUSED)
 			}
 
 			if (!strcmp(thread_current()->name, file_name))
+				// test
 				file_deny_write(thread_current()->exec_file);
 
 			f->R.rax = i;
