@@ -111,6 +111,7 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	// int i = 0;
 	// while(thread_current()->children[i] != -1) i++;
 	// thread_current()->children[i] = child_pid;
+	
 	if (child_pid == -1) return -1;
 	
 	int i = 0;
@@ -126,6 +127,7 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	sema_down(&thread_current()->fork_sema);	
 
 	struct thread* child = get_alive_by_tid(child_pid);
+
 	if (child->exit_code == -1){
 		thread_current()->children[i] = -1;
 		sema_up(&child->exit_sema);

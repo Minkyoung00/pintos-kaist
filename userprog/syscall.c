@@ -73,14 +73,12 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	case SYS_FORK:                   /* Clone current process. */
 	{
 		char *thread_name = f->R.rdi;
-		
 		if (!check_valid_mem(thread_name)) {
 			f->R.rax = -1;
 			break;
 		}
 
 		f->R.rax = process_fork(thread_name, f);
-		
 		break;
 	}
 	case SYS_EXEC:                   /* Switch current process. */

@@ -309,6 +309,12 @@ bool page_less(const struct hash_elem* a, const struct hash_elem* b, void *aux)
 	return pa->va < pb->va;
 }
 
+void free_hash(struct hash_elem *e, void *aux)
+{
+	struct page *p = hash_entry(e, struct page, hash_elem);
+	free(p);
+}
+
 
 /* Initialize new supplemental page table */
 void
@@ -324,8 +330,49 @@ bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
 	
-	struct hash old = src->hash;
-	dst->hash = old;
+	struct hash_iterator i;
+	hash_first(&i, &src->hash);
+	
+	while(hash_next(&i))
+	{
+		struct page* old_page = hash_entry(hash_cur(&i), struct page, hash_elem);
+		enum vm_type type = old_page->operations->type;
+		void *upage = old_page->va;
+		bool writable = old_page->wrt;
+		
+		switch (type)
+		{
+		case VM_ANON:
+		{
+			
+			if (!vm_alloc_page(type, upage, writable)) return false;
+			if (!vm_claim_page(upage)) return false;
+			struct page *new_page = spt_find_page(dst, upage);
+			memcpy(new_page->frame->kva, old_page->frame->kva, PGSIZE);
+			// file_backed_initializer
+		}
+			break;
+		case VM_UNINIT:
+		{
+			vm_initializer *init = old_page->uninit.init;
+			void *aux = old_page->uninit.aux;
+			vm_alloc_page_with_initializer(VM_ANON, upage, writable, init, aux);
+
+		}
+		break;
+		case VM_FILE:
+		{
+			printf("todo");
+		}
+
+		default:
+			break;
+		}
+	}
+
+	return true;
+	// struct hash old = src->hash;
+	// dst->hash = old;
 
 }
 
@@ -335,10 +382,11 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
 
-	
-	spt_find_page
-	destroy();
+
+	hash_clear(&spt->hash, free_hash);
 }
+
+
 
 
 

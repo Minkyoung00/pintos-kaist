@@ -15,15 +15,22 @@ Putting 'cow-simple' into the file system...
 Executing 'cow-simple':
 (cow-simple) begin
 (cow-simple) check data consistency
-cow-simple: exit(-1)
+(cow-simple) check data consistency
+(cow-simple) two phys addrs should be the same.
+(cow-simple) two phys addrs should be the same.: FAILED
+child: exit(1)
+(cow-simple) two phys addrs should be the same.
+(cow-simple) check data consistency
+(cow-simple) end
+cow-simple: exit(0)
 Execution of 'cow-simple' complete.
-Timer: 281 ticks
-Thread: 209 idle ticks, 68 kernel ticks, 4 user ticks
+Timer: 247 ticks
+Thread: 176 idle ticks, 66 kernel ticks, 5 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 90 reads, 8066 writes
 hd1:0: 4019 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 980 characters output
+Console: 1235 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...
