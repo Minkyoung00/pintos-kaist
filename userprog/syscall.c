@@ -290,15 +290,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		int writable = f->R.rdx;
 		int fd = f->R.r10;
 		off_t offset = f->R.r8;
-
-		if (!check_valid_fd(fd)||is_kernel_vaddr (addr)||length == 0||is_kernel_vaddr((void *)length)||pg_round_down(addr) != addr) {
+		
+		if (fd < 3||!check_valid_fd(fd)||is_kernel_vaddr (addr)||length == 0||is_kernel_vaddr((void *)length)||pg_ofs(addr) != 0 || pg_ofs(offset) != 0) {
 			f->R.rax = NULL;
 			break;
 		}
-
 		struct file* file = thread_current()->fd_table[fd];
 		
-		// file_seek(thread_current()->fd_table[fd], offset);
 		f->R.rax = do_mmap(addr, length, writable, file, offset);
 		break;
 	}
