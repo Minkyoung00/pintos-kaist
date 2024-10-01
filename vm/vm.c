@@ -169,20 +169,45 @@ vm_get_frame(void)
 }
 
 /* Growing the stack. */
+// static void
+// vm_stack_growth(void *addr UNUSED)
+// {
+// 	// add
+// 	void *stack_bottom = addr - PGSIZE;
+// 	struct supplemental_page_table *spt = &thread_current()->spt;
+
+// 	while (stack_bottom != pg_round_down(thread_current()->tf.rsp))
+// 	// lets test after smoke
+// 	{
+// 		// printf("stack_p : %p@@@@@@@@@@@@@@@@@\n", (void *)thread_current()->stack_p);
+// 		// printf("addr : %p@@@@@@@@@@@@@@@@@\n", (void *)stack_bottom);
+
+// 		// 페이지를 할당하여 스택 확장
+// 		// here
+// 		vm_alloc_page_with_initializer(VM_ANON, stack_bottom, true, NULL, NULL);
+
+// 		// 페이지 클레임
+// 		// here
+// 		vm_claim_page(stack_bottom);
+// 		stack_bottom += PGSIZE;
+// 	}
+// 	thread_current()->stack_bottom = stack_bottom;
+// }
+
 static void
 vm_stack_growth(void *addr UNUSED)
 {
-	void *stack_p = thread_current()->tf.rsp;
-	struct supplemental_page_table *spt = &thread_current()->spt;
-	while (addr < stack_p)
+	void *stack_bottom = addr - PGSIZE;
+
+	while (stack_bottom != thread_current()->stack_bottom)
 	{
-		// anon 페이지를 할당하면서 스택을 늘려주되, 그 단위는 PGSIZE요, 할당하는 횟수는 한번 이상이네.
-		// 어떻게 하니
-		// vm_alloc_page(VM_ANON,stack_p,true);
-		struct page *new_page = malloc(PGSIZE);
-		uninit_new(new_page, stack_p, NULL, VM_ANON, NULL, anon_initializer);
-		spt_insert_page(spt, new_page);
+		// printf("stack_bottom: %p\n",stack_bottom);
+		vm_alloc_page_with_initializer(VM_ANON | VM_MARKER_0, stack_bottom, true, NULL, NULL);
+		vm_claim_page(stack_bottom);
+		stack_bottom += PGSIZE;
+		// thread_current()->rsp = addr;
 	}
+	thread_current()->stack_bottom = stack_bottom;
 }
 
 /* Handle the fault on write_protected page */
@@ -190,6 +215,8 @@ static bool
 vm_handle_wp(struct page *page UNUSED)
 {
 }
+
+#define is_stack_addr(vaddr) ((uint64_t)(vaddr) <= USER_STACK && (uint64_t)(vaddr) >= USER_STACK - 256 * PGSIZE)
 
 /* Return true on success */
 bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED,
@@ -199,27 +226,33 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
-	void *stack_addr = pg_round_down(addr);
-	page = spt_find_page(spt, stack_addr);
+	page = spt_find_page(spt, pg_round_down(addr));
 	if (page == NULL)
 	{
+		uintptr_t cur_rsp;
+		if (user)
+			cur_rsp = f->rsp;
+		else
+			cur_rsp = thread_current()->stack_p;
+
+		// printf("cur_rsp: %p\n", cur_rsp);
+
+		if (write && is_stack_addr(addr) && addr <= cur_rsp)
+		{
+			vm_stack_growth(pg_round_up(addr));
+			return true;
+		}
 		return false;
 	}
-	// printf("page: %p\n", page);
-	// LOADER_PHYS_BASE;
-	// if (user)
-	// {
-	// 	stack_addr = f->rsp;
-	// }
-	// else
-	// {
-	// 	stack_addr = thread_current()->tf.rsp;
-	// }
-	// if (f->rsp >= addr)
-	// {
-	// 	vm_stack_growth(addr);
-	// }
-	return vm_do_claim_page(page); // hell
+	else
+	{
+		// printf("%d\n", spt_find_page(&thread_current()->spt, page->va)->operations->type & (VM_ANON | VM_MARKER_0));
+		/* 읽기 시도이고 page writable이 false면 */
+		if (write && !page->writable)
+			return false;
+	}
+
+	return vm_do_claim_page(page);
 }
 
 /* Free the page.
@@ -235,8 +268,7 @@ bool vm_claim_page(void *va UNUSED)
 {
 	struct page *page = NULL;
 	/* TODO: Fill this function */
-	// page = malloc(sizeof(struct page));
-	// page->va = va;
+
 	page = spt_find_page(&thread_current()->spt, va);
 
 	return vm_do_claim_page(page);
@@ -254,9 +286,6 @@ vm_do_claim_page(struct page *page)
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable);
-
-	// struct supplemental_page_table *spt = &thread_current()->spt;
-	// spt_insert_page(spt,page);
 
 	return swap_in(page, frame->kva);
 }

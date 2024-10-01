@@ -922,6 +922,8 @@ setup_stack(struct intr_frame *if_)
 	}
 	// TODO: If success, set the rsp accordingly.
 	if_->rsp = USER_STACK;
+	thread_current()->stack_p = USER_STACK;
+	thread_current()->stack_bottom = stack_bottom;
 	// TODO: You should mark the page is stack.
 	/* TODO: Your code goes here */
 
