@@ -19,6 +19,7 @@
 
 #ifdef VM
 #include "vm/vm.h"
+#include "userprog/process.h"
 #endif
 
 void syscall_entry (void);
@@ -89,6 +90,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	{
 		char *file = f->R.rdi; 
 		if (!check_valid_mem(file)) break;
+		
 		
 		char *fn_copy = palloc_get_page (0);
 		if (fn_copy == NULL)
@@ -201,6 +203,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			&& !(spt_find_page(&thread_current()->spt, buffer)->writable)){
 			set_code_and_exit(-1);
 		}
+
 		lock_acquire(&lock);
 
 		if (fd == 0) 
@@ -279,15 +282,38 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		break;
 	}
 
+	// /* Project 3 and optionally project 4. */
+	case SYS_MMAP:                   /* Map a file into memory. */
+	{
+		void *addr = f->R.rdi;
+		size_t length = f->R.rsi;
+		int writable = f->R.rdx;
+		int fd = f->R.r10;
+		off_t offset = f->R.r8;
+
+		if (!check_valid_fd(fd)||is_kernel_vaddr (addr)||length == 0||is_kernel_vaddr((void *)length)||pg_round_down(addr) != addr) {
+			f->R.rax = NULL;
+			break;
+		}
+
+		struct file* file = thread_current()->fd_table[fd];
+		
+		// file_seek(thread_current()->fd_table[fd], offset);
+		f->R.rax = do_mmap(addr, length, writable, file, offset);
+		break;
+	}
+	case SYS_MUNMAP:                 /* Remove a memory mapping. */
+	{
+		void *addr = f->R.rdi;
+		do_munmap(addr);
+		
+		break;
+	}
 	default:
 	{
 		set_code_and_exit(-1);
     	break;
 	}
-
-	// /* Project 3 and optionally project 4. */
-	// SYS_MMAP,                   /* Map a file into memory. */
-	// SYS_MUNMAP,                 /* Remove a memory mapping. */
 
 	// /* Project 4 only. */
 	// SYS_CHDIR,                  /* Change the current directory. */
@@ -320,10 +346,12 @@ set_code_and_exit(int exit_code){
 
 bool
 check_valid_fd(int fd){
-	for (int i = 0; i < 64; i++)
-	{
-		if (fd == i && thread_current()->fd_table[i] != NULL)
-			return true;
-	}
+	// for (int i = 0; i < 64; i++)
+	// {
+	// 	if (fd == i && thread_current()->fd_table[i] != NULL)
+	// 		return true;
+	// }
+	if (thread_current()->fd_table[fd] != NULL)
+		return true;
 	return false;
 }

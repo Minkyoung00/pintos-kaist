@@ -251,17 +251,21 @@ process_exec (void *f_name) {
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
 
+	// printf("rip: %p\n",_if.rip);
 	/* We first kill the current context */
+	// printf("\n\nExeC PROCESS_CLEANUP\n");
 	process_cleanup ();
+	// printf("PROCESS_CLEANUP\n");
+
 
 	/* And then load the binary */
 	success = load (file_name, &_if);
+	// printf("rip: %p\n",_if.rip);
 	// printf("sucess: %d\n", success);
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success)
 		return -1;
-
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -353,13 +357,13 @@ process_exit (void) {
 	sema_up(&curr->wait_sema);
 	
 	// if (thread_current()->parent->exit_sema != NULL)
-	sema_down(&curr->exit_sema);
 	// if (thread_current()->parent->wait_sema != NULL){
 	// 	if (!cnt_child)
 	// 		sema_up(thread_current()->parent->wait_sema);
 	// }
 	
 	process_cleanup ();
+	sema_down(&curr->exit_sema);
 }
 
 /* Free the current process's resources. */
@@ -369,8 +373,8 @@ process_cleanup (void) {
 
 #ifdef VM
 	supplemental_page_table_kill (&curr->spt);
+	// printf("\n\nHello\n\n");
 #endif
-
 	uint64_t *pml4;
 	/* Destroy the current process's page directory and switch back
 	 * to the kernel-only page directory. */
@@ -387,6 +391,7 @@ process_cleanup (void) {
 		pml4_activate (NULL);
 		pml4_destroy (pml4);
 	}
+	// printf("CLEANUP FIN\n");
 }
 
 /* Sets up the CPU for running user code in the nest thread.
@@ -471,7 +476,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	off_t file_ofs;
 	bool success = false;
 	int i;
-
+	
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
@@ -756,15 +761,6 @@ install_page (void *upage, void *kpage, bool writable) {
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
-struct info_binary{
-	struct file *file;
-	off_t ofs;
-	uint8_t *upage;
-	uint32_t read_bytes;
-	uint32_t zero_bytes;
-	bool writable;
-};
-
 static bool
 lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
@@ -847,7 +843,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
-		void *aux = NULL;
 		struct info_binary *info = malloc(sizeof(struct info_binary));
 		info->file = file;
 		info->ofs = ofs;
@@ -855,10 +850,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		info->read_bytes = page_read_bytes;
 		info->zero_bytes = page_zero_bytes;
 		info->writable = writable;
-		aux = info;
 
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, aux))
+					writable, lazy_load_segment, info))
 		{
 			return false;
 		}
@@ -887,7 +881,7 @@ setup_stack (struct intr_frame *if_) {
 	// printf("%d\n",(spt_find_page(&thread_current()->spt, stack_bottom)->uninit.type) & VM_MARKER_0);
 	if (vm_claim_page(stack_bottom)){
 		if_->rsp = USER_STACK;
-		thread_current()->stack_bottom = stack_bottom;
+		thread_current()->stack_bottom = (uintptr_t)stack_bottom;
 		success = true;
 	}
 	// printf("%d\n",(spt_find_page(&thread_current()->spt, stack_bottom)->operations->type) | VM_MARKER_0);

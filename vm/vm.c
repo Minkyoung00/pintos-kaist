@@ -44,7 +44,7 @@ static struct frame *vm_evict_frame (void);
 bool
 vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		vm_initializer *init, void *aux) {
-	// printf("alloc page addr: %p\n", upage);
+	// printf("\n\nalloc page addr: %p\n\n", upage);
 	ASSERT (VM_TYPE(type) != VM_UNINIT)
 
 	struct supplemental_page_table *spt = &thread_current ()->spt;
@@ -107,6 +107,7 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED,
 
 void
 spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
+	hash_delete(&spt->hash_table, &page->hash_elem);
 	vm_dealloc_page (page);
 	return true;
 }
@@ -186,7 +187,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
-	// printf("page: %p\n", pg_round_down(addr));
+	// printf("\n\npage: %p\n\n", pg_round_down(addr));
 	page = spt_find_page(spt, addr);
 	if (page == NULL) 
 	{
@@ -317,6 +318,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 			memcpy(info, aux, sizeof(struct info_binary));
 
 			vm_alloc_page_with_initializer(p->uninit.type, upage, writable, init, info);
+			// spt_insert_page(dst, p);
 		}
 	}
 	return true;
@@ -351,13 +353,16 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 
 			// enum vm_type type = VM_TYPE(page->operations->type);
 			// printf("page->frame->kva: %p\n",page->frame->kva );
-			(page->operations->destroy)(page);
+			vm_dealloc_page(page);
+			// (page->operations->destroy)(page);
 			
-			free(page);
+			// free(page);
 		}
 
 		list_init (bucket);
 	}
+	// printf("thread_name: %s\n", thread_current()->name);
+	// printf("function table_kill\n");
 
 	h->elem_cnt = 0;
 
