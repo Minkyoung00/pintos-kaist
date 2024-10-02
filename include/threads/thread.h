@@ -124,6 +124,7 @@ struct thread {
 	struct supplemental_page_table spt;
 	uintptr_t stack_bottom;
 	uintptr_t rsp;
+	struct lock *file_lock;
 #endif
 
 	/* Owned by thread.c. */

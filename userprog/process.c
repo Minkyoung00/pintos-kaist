@@ -101,7 +101,8 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	struct fork_args aux;
 	aux.thread = thread_current ();
 	aux.if_ = if_;
-	
+	// if (thread_current()->file_lock && thread_current()->file_lock->holder == thread_current()) 
+	// 	lock_release(thread_current()->file_lock);
  	// printf("pml4: %p\n",thread_current()->pml4);
 	tid_t child_pid = thread_create (name, 
 							PRI_DEFAULT, __do_fork, &aux);
@@ -120,6 +121,8 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	if (i < 32)
 		thread_current()->children[i] = child_pid;
 	else printf("CHILDREN LIST IS FULL!!");
+	// if (thread_current()->file_lock && thread_current()->file_lock->holder == thread_current()) 
+	// 	lock_release(thread_current()->file_lock);
 
 	sema_down(&thread_current()->fork_sema);	
 
@@ -265,6 +268,8 @@ process_exec (void *f_name) {
 	palloc_free_page (file_name);
 	if (!success)
 		return -1;
+	// if (thread_current()->file_lock && thread_current()->file_lock->holder == thread_current()) 
+	// 	lock_release(thread_current()->file_lock);
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -288,7 +293,6 @@ process_wait (tid_t child_tid UNUSED) {
 
 	// tid_t children[64]; 
 	// memcpy(children, thread_current()->children, sizeof(tid_t) * 64);
-
 	
 	for (int i = 0; i < 32; i ++){
 		if (thread_current()->children[i] == child_tid)
@@ -361,8 +365,9 @@ process_exit (void) {
 	// 	if (!cnt_child)
 	// 		sema_up(thread_current()->parent->wait_sema);
 	// }
-	
 	process_cleanup ();
+	// if (thread_current()->file_lock && thread_current()->file_lock->holder == thread_current()) 
+	// 	lock_release(thread_current()->file_lock);
 	sema_down(&curr->exit_sema);
 }
 

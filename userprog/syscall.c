@@ -41,7 +41,7 @@ bool check_valid_fd(int fd);
 #define MSR_LSTAR 0xc0000082        /* Long mode SYSCALL target */
 #define MSR_SYSCALL_MASK 0xc0000084 /* Mask for the eflags */
 
-struct lock lock;
+// struct lock lock;
 
 void
 syscall_init (void) {
@@ -55,7 +55,7 @@ syscall_init (void) {
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 	
-	lock_init(&lock);
+	// lock_init(&lock);
 }
 
 /* The main system call interface */
@@ -84,13 +84,12 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			break;
 		}
 		f->R.rax = process_fork(thread_name, f);
-		
 		break;
 	}
 	case SYS_EXEC:                   /* Switch current process. */
 	{
-		// lock_acquire(&lock);
 		// printf("%s | SYS_EXEC\n",thread_current()->name);
+		// lock_acquire(&lock);
 		char *file = f->R.rdi; 
 		if (!check_valid_mem(file)) break;
 		
@@ -103,28 +102,31 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			file_close(thread_current()->exec_file);
 			// file_allow_write(thread_current()->exec_file);	
 		thread_current()->exec_file = NULL;
-
+		// thread_current()->file_lock = &lock;
+		// lock_release(&lock);
 		if (process_exec(fn_copy) < 0)
 		{
 			f->R.rax = -1;
 			set_code_and_exit(-1);
 		}
-		// lock_release(&lock);
 		break;
 	}
 	case SYS_WAIT:                   /* Wait for a child process to die. */
 	{
+		// printf("%s | SYS_WAIT\n",thread_current()->name);
+		// lock_acquire(&lock);
 		tid_t pid = f->R.rdi;
 
+		// lock_release(&lock);
 		f->R.rax = process_wait(pid);
 		// thread_current()->children[pid] = NULL;
-
 		break;
 	}
 	case SYS_CREATE:                 /* Create a file. */
 	{
-		// lock_acquire(&lock);
 		// printf("%s | SYS_CREATE\n",thread_current()->name);
+		// lock_acquire(&lock);
+
 		char *file = f->R.rdi; 
 		unsigned initial_size = f->R.rsi;
 		if (check_valid_mem(file)){
@@ -150,6 +152,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	}
 	case SYS_OPEN: {				/* Open a file. */
 		// printf("%s | SYS_OPEN\n",thread_current()->name);
+
 		char *file_name = f->R.rdi;
 		if (!check_valid_mem(file_name))
 			set_code_and_exit(-1);
@@ -168,6 +171,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			else {
 				file_close(open_file);
 				f->R.rax = -1;
+
 				break;
 			}
 
@@ -175,6 +179,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				file_deny_write(thread_current()->exec_file);
 
 			f->R.rax = i;
+
 		}
 		break;
 	}                   
@@ -279,7 +284,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	{
 		// printf("%s | SYS_CLOSE\n",thread_current()->name);
 		int fd = f->R.rdi;
-
 		if (!check_valid_fd(fd)) break;
 		
 		struct file* close_file 
@@ -287,7 +291,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		
 		file_close(close_file);
 		thread_current()->fd_table[fd] = NULL;	
-		// lock_release(&lock)
 		// sema_up(&thread_current()->fork_sema());
 		break;
 	}

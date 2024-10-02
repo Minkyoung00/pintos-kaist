@@ -9,10 +9,11 @@
 #include "devices/disk.h"
 
 #include "threads/synch.h"
+#include "userprog/syscall.h"
 
 /* The disk that contains the file system. */
 struct disk *filesys_disk;
-
+// struct lock lock;
 static void do_format (void);
 
 /* Initializes the file system module.
@@ -22,7 +23,7 @@ filesys_init (bool format) {
 	filesys_disk = disk_get (0, 1);
 	if (filesys_disk == NULL)
 		PANIC ("hd0:1 (hdb) not present, file system initialization failed");
-
+	// lock_init(&lock);
 	inode_init ();
 
 #ifdef EFILESYS
@@ -62,7 +63,9 @@ filesys_done (void) {
 bool
 filesys_create (const char *name, off_t initial_size) {
 	disk_sector_t inode_sector = 0;
+	// lock_acquire(&lock);
 	struct dir *dir = dir_open_root ();
+	// lock_release(&lock);
 	bool success = (dir != NULL
 			&& free_map_allocate (1, &inode_sector)
 			&& inode_create (inode_sector, initial_size)
@@ -81,7 +84,9 @@ filesys_create (const char *name, off_t initial_size) {
  * or if an internal memory allocation fails. */
 struct file *
 filesys_open (const char *name) {
+	// lock_acquire(&lock);
 	struct dir *dir = dir_open_root ();
+	// lock_release(&lock);
 	struct inode *inode = NULL;
 
 	if (dir != NULL)

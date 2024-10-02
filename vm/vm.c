@@ -5,6 +5,8 @@
 #include "vm/inspect.h"
 #include "threads/mmu.h"
 
+// struct list frame_table;
+
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
 void
@@ -17,6 +19,7 @@ vm_init (void) {
 	register_inspect_intr ();
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
+	// list_init (&frame_table);
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -121,7 +124,9 @@ vm_get_victim (void) {
 	hash_first (&i, &thread_current()->spt.hash_table);
 	while (hash_next (&i)) {
 		struct page *p = hash_entry (hash_cur (&i), struct page, hash_elem);
-		if (!pml4_is_accessed(thread_current()->pml4, p->va) == 0) {
+		if (pml4_get_page(thread_current()->pml4, p->va) && !pml4_is_accessed(thread_current()->pml4, p->va)) {
+			// printf("get vicim\n");
+			// printf("%p\n",p->frame);
 			return p->frame;
 		}
 		else{
@@ -137,6 +142,7 @@ static struct frame *
 vm_evict_frame (void) {
 	struct frame *victim UNUSED = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
+	while(victim == NULL) victim = vm_get_victim ();
 	// printf("victim->page: %p\n",victim->page);
 	if (swap_out(victim->page))
 		return victim;

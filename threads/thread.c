@@ -680,6 +680,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 #ifdef VM
 	t->stack_bottom = NULL;
 	t->rsp = NULL;
+	t->file_lock = NULL;
 #endif
 }
 
