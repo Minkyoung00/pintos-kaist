@@ -257,7 +257,6 @@ process_exec (void *f_name) {
 	process_cleanup ();
 	// printf("PROCESS_CLEANUP\n");
 
-
 	/* And then load the binary */
 	success = load (file_name, &_if);
 	// printf("rip: %p\n",_if.rip);
@@ -301,8 +300,9 @@ process_wait (tid_t child_tid UNUSED) {
 			// else{
 			struct thread* child = get_alive_by_tid(child_tid);
 		
+			// printf("%s down\n", thread_current()->name);
 			sema_down(&child->wait_sema);
-
+			// printf("%s up\n", thread_current()->name);
 
 			// }
 			// int exit_code = 0;
@@ -496,7 +496,6 @@ load (const char *file_name, struct intr_frame *if_) {
 		argc ++;
 	}
 	argv[argc] = NULL;	 
-
 	/* Open executable file. */
 	file = filesys_open (argv[0]);
 	if (file == NULL) {

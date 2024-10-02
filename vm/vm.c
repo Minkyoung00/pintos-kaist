@@ -117,7 +117,17 @@ static struct frame *
 vm_get_victim (void) {
 	struct frame *victim = NULL;
 	 /* TODO: The policy for eviction is up to you. */
-
+	struct hash_iterator i;
+	hash_first (&i, &thread_current()->spt.hash_table);
+	while (hash_next (&i)) {
+		struct page *p = hash_entry (hash_cur (&i), struct page, hash_elem);
+		if (!pml4_is_accessed(thread_current()->pml4, p->va) == 0) {
+			return p->frame;
+		}
+		else{
+			pml4_set_accessed(thread_current()->pml4, p->va, false);
+		}
+	}
 	return victim;
 }
 
@@ -127,7 +137,9 @@ static struct frame *
 vm_evict_frame (void) {
 	struct frame *victim UNUSED = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
-
+	// printf("victim->page: %p\n",victim->page);
+	if (swap_out(victim->page))
+		return victim;
 	return NULL;
 }
 
@@ -146,7 +158,10 @@ vm_get_frame (void) {
 		frame->page = NULL;
 	}
 	else{
-		PANIC ("todo");
+		// PANIC ("todo");
+		frame = vm_evict_frame();
+		// frame->kva = kpage;
+		frame->page = NULL;
 	}
 
 	ASSERT (frame != NULL);

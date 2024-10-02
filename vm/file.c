@@ -30,35 +30,49 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 
 	struct file_page *file_page = &page->file;
 	file_page->file = NULL;
+	file_page->exist_bytes = 0;
+	return true;
 }
 
 /* Swap in the page by read contents from the file. */
 static bool
 file_backed_swap_in (struct page *page, void *kva) {
 	struct file_page *file_page UNUSED = &page->file;
+
+	file_seek (file_page->file, ((struct info_file *)(page->uninit.aux))->ofs);
+
+	size_t page_read_bytes = file_read (file_page->file, kva, file_page->exist_bytes);
+	size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+	memset (kva + page_read_bytes, 0, page_zero_bytes);
+	// page->file.exist_bytes = page_read_bytes;
+	// page->file.file = file;
+	pml4_set_dirty(thread_current()->pml4, page->va, false);
+	return true;
 }
 
 /* Swap out the page by writeback contents to the file. */
 static bool
 file_backed_swap_out (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
+
+	struct info_file *aux = (struct info_file *)page->uninit.aux;
+
+	if (pml4_is_dirty(thread_current()->pml4, page->va)){
+		file_write_at(file_page->file, page->va, aux->length, aux->ofs);
+		pml4_set_dirty(thread_current()->pml4, page->va, false);
+	}
+
+	pml4_clear_page(thread_current()->pml4, page->va);
+	return true;
 }
 
 /* Destory the file backed page. PAGE will be freed by the caller. */
 static void
 file_backed_destroy (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
-
-	struct info_file *aux = (struct info_file *)page->uninit.aux;
-	// printf("try to write\n");
-	if (pml4_is_dirty(thread_current()->pml4, page->va)){
-		file_write_at(file_page->file, page->va, aux->length, aux->ofs);
-		pml4_set_dirty(thread_current()->pml4, page->va, false);
-	}
-	// printf("destroy: %p\n", page->va);
-
+	swap_out(page);
 	pml4_clear_page(thread_current()->pml4, page->va);
-	// file_close(file_page->file);
 }
 
 static bool

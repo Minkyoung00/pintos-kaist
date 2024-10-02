@@ -77,6 +77,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	}
 	case SYS_FORK:                   /* Clone current process. */
 	{
+		// printf("%s | SYS_FORK\n",thread_current()->name);
 		char *thread_name = f->R.rdi;
 		if (!check_valid_mem(thread_name)) {
 			f->R.rax = -1;
@@ -88,9 +89,10 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	}
 	case SYS_EXEC:                   /* Switch current process. */
 	{
+		// lock_acquire(&lock);
+		// printf("%s | SYS_EXEC\n",thread_current()->name);
 		char *file = f->R.rdi; 
 		if (!check_valid_mem(file)) break;
-		
 		
 		char *fn_copy = palloc_get_page (0);
 		if (fn_copy == NULL)
@@ -107,6 +109,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			f->R.rax = -1;
 			set_code_and_exit(-1);
 		}
+		// lock_release(&lock);
 		break;
 	}
 	case SYS_WAIT:                   /* Wait for a child process to die. */
@@ -120,15 +123,19 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	}
 	case SYS_CREATE:                 /* Create a file. */
 	{
+		// lock_acquire(&lock);
+		// printf("%s | SYS_CREATE\n",thread_current()->name);
 		char *file = f->R.rdi; 
 		unsigned initial_size = f->R.rsi;
-
-		if (check_valid_mem(file))
+		if (check_valid_mem(file)){
 			f->R.rax = filesys_create(file, initial_size);
+		}
 		
-		else
+		else{
+			// printf("filesys_create: FAILED\n");
 			set_code_and_exit(-1);
-		
+		}
+		// lock_release(&lock);
 		break;
 	}
 	case SYS_REMOVE:                 /* Delete a file. */
@@ -142,14 +149,15 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		break;
 	}
 	case SYS_OPEN: {				/* Open a file. */
+		// printf("%s | SYS_OPEN\n",thread_current()->name);
 		char *file_name = f->R.rdi;
 		if (!check_valid_mem(file_name))
 			set_code_and_exit(-1);
-
+		// printf("file_name: %s\n",file_name);
 		struct file* open_file = filesys_open(file_name);
-		
-		if (open_file == NULL)
+		if (open_file == NULL){
 			f->R.rax = -1;
+		}
 		else
 		{
 			// 64->32 반영 안 해줘서 터짐
@@ -184,6 +192,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 	case SYS_READ:                   /* Read from a file. */
 	{
+		// printf("%s | SYS_READ\n",thread_current()->name);
 		int fd = f->R.rdi;
 		void *buffer = f->R.rsi;
 		unsigned size = f->R.rdx;
@@ -204,8 +213,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			set_code_and_exit(-1);
 		}
 
-		lock_acquire(&lock);
-
+		// lock_acquire(&lock);
 		if (fd == 0) 
 			f->R.rax = input_getc();
 
@@ -215,20 +223,20 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					= (struct file*)(thread_current()->fd_table[fd]);
 			f->R.rax = file_read(read_file, buffer, size);
 		}
-		lock_release(&lock);
+		// lock_release(&lock);
 		break;
 	}
 	case SYS_WRITE: {                /* Write to a file. */
 		int fd = f->R.rdi;
 		void *buffer = f->R.rsi;
 		unsigned size = f->R.rdx;
-		
+		// if (fd != 1){
+		// 	printf("%s | SYS_WRITE FD: %d\n",thread_current()->name, fd);
+		// }
 		if (!check_valid_mem(buffer) || !check_valid_fd(fd)){
 			set_code_and_exit(-1);
 		} 
 
-		lock_acquire(&lock);
-		
 		if (fd == 1) 
 		{
 			putbuf(buffer, size);
@@ -248,7 +256,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			
 			// palloc_free_page (contents);	
 		}
-		lock_release(&lock);	
+		// lock_release(&lock);	
 		break;
 	}
 	case SYS_SEEK:                   /* Change position in a file. */
@@ -269,6 +277,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	}
 	case SYS_CLOSE:                  /* Close a file. */
 	{
+		// printf("%s | SYS_CLOSE\n",thread_current()->name);
 		int fd = f->R.rdi;
 
 		if (!check_valid_fd(fd)) break;
@@ -277,8 +286,9 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				= thread_current()->fd_table[fd];
 		
 		file_close(close_file);
-		thread_current()->fd_table[fd] = NULL;
-	
+		thread_current()->fd_table[fd] = NULL;	
+		// lock_release(&lock)
+		// sema_up(&thread_current()->fork_sema());
 		break;
 	}
 
