@@ -198,16 +198,18 @@ static void
 vm_stack_growth(void *addr UNUSED)
 {
 	void *stack_bottom = addr - PGSIZE;
-
+	// test code
+	// void *stack_bottom = addr;
+	// int i = 0;
 	while (stack_bottom != thread_current()->stack_bottom)
 	{
 		// printf("stack_bottom: %p\n",stack_bottom);
 		vm_alloc_page_with_initializer(VM_ANON | VM_MARKER_0, stack_bottom, true, NULL, NULL);
 		vm_claim_page(stack_bottom);
 		stack_bottom += PGSIZE;
-		// thread_current()->rsp = addr;
+		// printf("%d@@@@@@@@@@@@@@\n", i);
+		// i += 1;
 	}
-	thread_current()->stack_bottom = stack_bottom;
 }
 
 /* Handle the fault on write_protected page */
@@ -229,18 +231,25 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED,
 	page = spt_find_page(spt, pg_round_down(addr));
 	if (page == NULL)
 	{
-		uintptr_t cur_rsp;
+		uintptr_t stack_p = thread_current()->stack_p;
+		uintptr_t user_stack_p = f->rsp;
 		if (user)
-			cur_rsp = f->rsp;
-		else
-			cur_rsp = thread_current()->stack_p;
-
-		// printf("cur_rsp: %p\n", cur_rsp);
-
-		if (write && is_stack_addr(addr) && addr <= cur_rsp)
 		{
-			vm_stack_growth(pg_round_up(addr));
-			return true;
+			// write해줄 상황이 아니라면 스택을 늘려줄 필요가 없다.
+			if (write && is_stack_addr(addr) && addr <= user_stack_p)
+			{
+				vm_stack_growth(pg_round_up(addr));
+				return true;
+			}
+		}
+		else
+		{
+			// write해줄 상황이 아니라면 스택을 늘려줄 필요가 없다.
+			if (write && is_stack_addr(addr) && addr <= stack_p)
+			{
+				vm_stack_growth(pg_round_up(addr));
+				return true;
+			}
 		}
 		return false;
 	}
