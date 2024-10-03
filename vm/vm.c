@@ -50,12 +50,14 @@ static struct frame *vm_evict_frame(void);
 bool vm_alloc_page_with_initializer(enum vm_type type, void *upage, bool writable,
 									vm_initializer *init, void *aux)
 {
-	// 페이지 구조체를 할당하고 페이지 타입에 맞는 적절한 초기화 함수를 세팅함으로써 새로운 페이지를 초기화를 하고 유저 프로그램으로 제어권을 넘긴다.
+	// 페이지 구조체를 할당하고 페이지 타입에 맞는 적절한 초기화 함수를 세팅함으로써
+	// 새로운 페이지를 초기화를 하고 유저 프로그램으로 제어권을 넘긴다.
 
 	ASSERT(VM_TYPE(type) != VM_UNINIT)
 
 	struct supplemental_page_table *spt = &thread_current()->spt;
 	/* Check wheter the upage is already occupied or not. */
+	// 페이지가 없으면 만들어줘라.
 	if (spt_find_page(spt, upage) == NULL)
 	{
 		/* TODO: Create the page, fetch the initialier according to the VM type,
@@ -158,7 +160,7 @@ vm_get_frame(void)
 	}
 	else
 	{
-		// evict 추후 구현 예정 기모띠
+		// evict 추후 구현 예정
 		frame = vm_evict_frame();
 		frame->page = NULL;
 	}
@@ -168,43 +170,19 @@ vm_get_frame(void)
 	return frame;
 }
 
-/* Growing the stack. */
-// static void
-// vm_stack_growth(void *addr UNUSED)
-// {
-// 	// add
-// 	void *stack_bottom = addr - PGSIZE;
-// 	struct supplemental_page_table *spt = &thread_current()->spt;
-
-// 	while (stack_bottom != pg_round_down(thread_current()->tf.rsp))
-// 	// lets test after smoke
-// 	{
-// 		// printf("stack_p : %p@@@@@@@@@@@@@@@@@\n", (void *)thread_current()->stack_p);
-// 		// printf("addr : %p@@@@@@@@@@@@@@@@@\n", (void *)stack_bottom);
-
-// 		// 페이지를 할당하여 스택 확장
-// 		// here
-// 		vm_alloc_page_with_initializer(VM_ANON, stack_bottom, true, NULL, NULL);
-
-// 		// 페이지 클레임
-// 		// here
-// 		vm_claim_page(stack_bottom);
-// 		stack_bottom += PGSIZE;
-// 	}
-// 	thread_current()->stack_bottom = stack_bottom;
-// }
-
 static void
 vm_stack_growth(void *addr UNUSED)
 {
+	addr = pg_round_up(addr);
 	void *stack_bottom = addr - PGSIZE;
 	// test code
 	// void *stack_bottom = addr;
 	// int i = 0;
-	while (stack_bottom != thread_current()->stack_bottom)
+	thread_current()->stack_bottom = pg_round_down(thread_current()->stack_bottom);
+	while (stack_bottom < thread_current()->stack_bottom)
 	{
 		// printf("stack_bottom: %p\n",stack_bottom);
-		vm_alloc_page_with_initializer(VM_ANON | VM_MARKER_0, stack_bottom, true, NULL, NULL);
+		vm_alloc_page_with_initializer(VM_ANON, stack_bottom, true, NULL, NULL);
 		vm_claim_page(stack_bottom);
 		stack_bottom += PGSIZE;
 		// printf("%d@@@@@@@@@@@@@@\n", i);
@@ -238,7 +216,7 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED,
 			// write해줄 상황이 아니라면 스택을 늘려줄 필요가 없다.
 			if (write && is_stack_addr(addr) && addr <= user_stack_p)
 			{
-				vm_stack_growth(pg_round_up(addr));
+				vm_stack_growth(addr);
 				return true;
 			}
 		}
@@ -247,7 +225,7 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED,
 			// write해줄 상황이 아니라면 스택을 늘려줄 필요가 없다.
 			if (write && is_stack_addr(addr) && addr <= stack_p)
 			{
-				vm_stack_growth(pg_round_up(addr));
+				vm_stack_growth(addr);
 				return true;
 			}
 		}
@@ -255,7 +233,6 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED,
 	}
 	else
 	{
-		// printf("%d\n", spt_find_page(&thread_current()->spt, page->va)->operations->type & (VM_ANON | VM_MARKER_0));
 		/* 읽기 시도이고 page writable이 false면 */
 		if (write && !page->writable)
 			return false;

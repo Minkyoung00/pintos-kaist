@@ -203,6 +203,11 @@ void syscall_handler(struct intr_frame *f UNUSED)
 		int fd = f->R.rdi;
 		void *buffer = f->R.rsi;
 		unsigned size = f->R.rdx;
+#ifdef VM
+		struct page *page = spt_find_page(&thread_current()->spt, buffer);
+		if (page && !page->writable)
+			set_code_and_exit(-1);
+#endif
 
 		if (!check_valid_fd(fd) || !check_valid_mem(buffer))
 		{
