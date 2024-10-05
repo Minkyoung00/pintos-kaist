@@ -353,7 +353,7 @@ process_exit (void) {
 
 	// if (curr->parent->wait_sema != NULL)
 	sema_up(&curr->wait_sema);
-	
+	process_cleanup ();
 	// if (thread_current()->parent->exit_sema != NULL)
 	sema_down(&curr->exit_sema);
 	// if (thread_current()->parent->wait_sema != NULL){
@@ -361,7 +361,7 @@ process_exit (void) {
 	// 		sema_up(thread_current()->parent->wait_sema);
 	// }
 	
-	process_cleanup ();
+	
 }
 
 /* Free the current process's resources. */
@@ -758,21 +758,14 @@ install_page (void *upage, void *kpage, bool writable) {
 			&& pml4_set_page (t->pml4, upage, kpage, writable));
 }
 
+
 #else
 /* From here, codes will be used after project 3.
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
-struct info_binary{
-	struct file *file;
-	off_t ofs;
-	uint8_t *upage;
-	uint32_t read_bytes;
-	uint32_t zero_bytes;
-	bool writable;
-};
 
-static bool
+bool
 lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */

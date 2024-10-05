@@ -338,7 +338,7 @@ process_exit (void) {
 	printf ("curr sema val1: %d\n",curr->wait_sema.value);
 	sema_up(&curr->wait_sema);
 	printf ("curr sema val2: %d\n",curr->wait_sema.value);
-
+	process_cleanup ();
 	// if (thread_current()->parent->exit_sema != NULL)
 	sema_down(&curr->exit_sema);
 	// if (thread_current()->parent->wait_sema != NULL){
@@ -346,7 +346,7 @@ process_exit (void) {
 	// 		sema_up(thread_current()->parent->wait_sema);
 	// }
 	
-	process_cleanup ();
+	
 }
 
 /* Free the current process's resources. */

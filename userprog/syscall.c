@@ -16,6 +16,7 @@
 #include "devices/input.h"
 #include "userprog/process.h"
 #include "threads/synch.h"
+#include "vm/vm.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -58,9 +59,10 @@ void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
 	thread_current()->is_user = true;
+	thread_current()->rsp = f->rsp;
 	
 	switch (f->R.rax) {
-	case SYS_HALT:                   /* Halt the operating system. */ 
+	case SYS_HALT:                   /* Halt the operating system. */
 	{
 		power_off();
 		break;
@@ -112,6 +114,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 		break;
 	}
+
 	case SYS_CREATE:                 /* Create a file. */
 	{
 		char *file = f->R.rdi; 
@@ -125,6 +128,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		
 		break;
 	}
+
 	case SYS_REMOVE:                 /* Delete a file. */
 	{
 		char *file_name = f->R.rdi;
@@ -144,6 +148,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		
 		if (open_file == NULL)
 			f->R.rax = -1;
+
 		else
 		{
 			// int i = 0;
@@ -189,25 +194,42 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		if (!check_valid_fd(fd) || !check_valid_mem(buffer)){
 			set_code_and_exit(-1);
 		} 
+		struct thread *cur = thread_current();
+		// struct page *p = spt_find_page(&thread_current()->spt, pg_round_down(buffer));
+		uint64_t *pte = pml4e_walk(thread_current()->pml4,buffer,1);
+		// !is_writable(pte)
 
 		lock_acquire(&lock);
+
+		if (pml4_get_page(cur->pml4, buffer) != NULL && !is_writable(pte))
+		{
+			set_code_and_exit(-1);
+		}
+
+		// if (p==NULL || !p->wrt)
+		// {
+		// 	set_code_and_exit(-1);
+		// }
 
 		if (fd == 0) 
 			f->R.rax = input_getc();
 
-		else
+		else 
 		{
 			struct file* read_file 
 					= (struct file*)(thread_current()->fd_table[fd]);
 			f->R.rax = file_read(read_file, buffer, size);
 		}
-		lock_release(&lock);	
+
+		lock_release(&lock);
+
 		break;
 	}
 	case SYS_WRITE: {                /* Write to a file. */
 		int fd = f->R.rdi;
 		void *buffer = f->R.rsi;
 		unsigned size = f->R.rdx;
+
 		if (!check_valid_mem(buffer) || !check_valid_fd(fd)){
 			set_code_and_exit(-1);
 		} 
@@ -266,7 +288,62 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	
 		break;
 	}
+	case SYS_MMAP:
+	{
+		void *addr = f->R.rdi;
+		size_t *length = f->R.rsi;
+		int writable = f->R.rdx;
+		int fd = f->R.r10;
+		off_t offset = f->R.r8;
 
+		struct thread *cur = thread_current();
+		
+		if (fd == 0 || fd == 1) 
+		{
+			f->R.rax = NULL;
+			return NULL;
+		}
+		if (length == 0 || addr == 0) 
+		{
+			f->R.rax = NULL;
+			return NULL;
+		}
+		if (pg_ofs(addr) != 0 || offset > PGSIZE)
+		{
+			f->R.rax = NULL;
+			return NULL;
+		}
+		if (!check_valid_fd(fd))
+		{
+			f->R.rax = NULL;
+			return NULL;
+		}
+
+		if (fd < 0) 
+		{
+			f->R.rax = NULL;
+			return NULL;
+		}
+
+		struct file *file = cur->fd_table[fd];
+		
+		if (file == NULL || file_length(file) == 0) 
+		{	
+			f->R.rax = NULL;
+			return NULL;
+		}
+
+		// if (file_length(f) == 0 || (int)length <= 0) return NULL;
+		f->R.rax = do_mmap(addr, length, writable, file, offset);
+
+	}
+	break;
+	case SYS_MUNMAP:
+	{
+		void *addr = f->R.rdi;
+		do_munmap(addr);
+	}
+	break;
 	default:
 	{
 		set_code_and_exit(-1);
@@ -299,6 +376,7 @@ check_valid_mem(void* ptr){
 		return false;
 	return true;
 }
+
 
 void
 set_code_and_exit(int exit_code){

@@ -1,20 +1,16 @@
 FAIL
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (mmap-kernel) begin
-  (mmap-kernel) open "sample.txt"
-  (mmap-kernel) try to mmap over kernel 0
-  (mmap-kernel) try to mmap over kernel 1
-  (mmap-kernel) try to mmap over kernel 2
-  (mmap-kernel) end
-  mmap-kernel: exit(0)
-Differences in `diff -u' format:
-  (mmap-kernel) begin
-  (mmap-kernel) open "sample.txt"
-  (mmap-kernel) try to mmap over kernel 0
-- (mmap-kernel) try to mmap over kernel 1
-- (mmap-kernel) try to mmap over kernel 2
-- (mmap-kernel) end
-- mmap-kernel: exit(0)
-+ mmap-kernel: exit(-1)
+Kernel panic in run: PANIC at ../../threads/palloc.c:305 in palloc_free_multiple(): assertion `pg_ofs (pages) == 0' failed.
+Call stack: 0x80042187e7 0x800420befd 0x800420c0a0 0x8004222258 0x8004221c17 0x8004221904 0x8004222631 0x800421e281 0x800421d6a0 0x400277 0x400d4d 0x400d96
+Translation of call stack:
+0x00000080042187e7: debug_panic (lib/kernel/debug.c:32)
+0x000000800420befd: palloc_free_multiple (threads/palloc.c:306)
+0x000000800420c0a0: palloc_free_page (threads/palloc.c:329)
+0x0000008004222258: uninit_destroy (vm/uninit.c:77)
+0x0000008004221c17: vm_dealloc_page (vm/vm.c:291)
+0x0000008004221904: spt_remove_page (vm/vm.c:165)
+0x0000008004222631: do_mmap (vm/file.c:110)
+0x000000800421e281: syscall_handler (userprog/syscall.c:337)
+0x000000800421d6a0: no_sti (userprog/syscall-entry.o:?)
+0x0000000000400277: (unknown)
+0x0000000000400d4d: (unknown)
+0x0000000000400d96: (unknown)

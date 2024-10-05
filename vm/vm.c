@@ -6,6 +6,7 @@
 #include "lib/kernel/hash.h"
 #include "../include/threads/mmu.h"
 
+
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
 int page_hash(struct hash_elem* e);
@@ -75,10 +76,13 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		switch (VM_TYPE(type))
 		{
 		case VM_ANON:{
+			
+
 			uninit_new(p, upage, init, type, aux, anon_initializer);
 			}
 			break;
 		case VM_FILE:{
+			// printf("HI22\n\n");
 			uninit_new(p, upage, init, type, aux, file_backed_initializer);
 			}
 			break;
@@ -103,12 +107,13 @@ err:
 
 struct page *
 page_lookup (struct hash *h UNUSED, const void *address) {
-  struct page p;
-  struct hash_elem *e;
 
-  p.va = address;
-  e = hash_find (h, &p.hash_elem);
-  return e != NULL ? hash_entry (e, struct page, hash_elem) : NULL;
+	struct page p;
+	struct hash_elem *e;
+	p.va = address;
+	e = hash_find (h, &p.hash_elem);
+	return e != NULL ? hash_entry (e, struct page, hash_elem) : NULL;
+
 }
 
 /* Find VA from spt and return page. On error, return NULL. */
@@ -155,6 +160,7 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED,
 void
 spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 	// printf("page_get_type");
+	hash_delete(&spt->hash, &page->hash_elem);
 	vm_dealloc_page (page);
 	return true;
 }
@@ -212,6 +218,9 @@ vm_get_frame (void) {
 static void
 vm_stack_growth (void *addr UNUSED) {
 
+	// 스택 할당???
+
+	vm_alloc_page(VM_ANON, pg_round_down(addr),1);
 
 }
 
@@ -230,18 +239,45 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
+		// printf("%p\n\n", addr);
 	if (!not_present)
 	{
 		return false;
 	}
 
 	if(!is_user_vaddr (addr)){
+		
 		return false;
 	}
+	// 1. 이게 스택호출인지?
+	// 2. 현재 스텍 할당량보다 더 큰지?
+	// 3. 최대량인 1mb를 넘진 않는지
+	void* rsp = f->rsp;
+	if (!user) rsp = thread_current()->rsp;
 
+	// 1. 유저스택 시작주소 - 1MB 즉, 최대 스택 길이
+	// 2. rsp 현재 스택의 최하단 주소
+	// 3. addr 페이지 폴트를 일으킨, 현재 가리키고 있는 주소
+	// 4. 기본 유저스택 즉 시작지점
+	// USER_STACK - (1 << 20) <= rsp <= addr <= USER_STACK
+
+	// push 예외 처리
+	if (USER_STACK - (1 << 20) <= rsp-8 && rsp - 8 <= addr && addr <= USER_STACK)
+		{
+			// printf("%p %p %p %p\n", USER_STACK-(1<<20), rsp-8, addr, USER_STACK);
+			// printf("%p\n", addr);
+			// printf("pass 1\n");
+			vm_stack_growth(addr);
+		}
+	// else if (USER_STACK - (1 << 20) <= rsp && rsp <= addr && addr <= USER_STACK)
+	// 	{
+	// 		// printf("pass 2");
+	// 		vm_stack_growth(addr);
+	// 	}
 	page = spt_find_page(spt, pg_round_down(addr));
 
 	if (page == NULL) return false;
+	if (write == 1 && page->wrt == 0) return false;
 
 	return vm_do_claim_page (page);
 }
@@ -325,11 +361,19 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 
 }
 
+
+struct info_binary{
+	struct file *file;
+	off_t ofs;
+	uint8_t *upage;
+	uint32_t read_bytes;
+	uint32_t zero_bytes;
+	bool writable;
+};
 /* Copy supplemental page table from src to dst */
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
-	
 	struct hash_iterator i;
 	hash_first(&i, &src->hash);
 	
@@ -340,29 +384,38 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		void *upage = old_page->va;
 		bool writable = old_page->wrt;
 		
-		switch (type)
+		switch (VM_TYPE(type))
 		{
 		case VM_ANON:
 		{
-			
+
 			if (!vm_alloc_page(type, upage, writable)) return false;
 			if (!vm_claim_page(upage)) return false;
+
 			struct page *new_page = spt_find_page(dst, upage);
+
 			memcpy(new_page->frame->kva, old_page->frame->kva, PGSIZE);
-			// file_backed_initializer
+
 		}
 			break;
 		case VM_UNINIT:
 		{
+
+			enum vm_type type_un = old_page->uninit.type;
 			vm_initializer *init = old_page->uninit.init;
 			void *aux = old_page->uninit.aux;
-			vm_alloc_page_with_initializer(VM_ANON, upage, writable, init, aux);
+			
+			void *info = malloc(sizeof(struct info_binary));
+
+			memcpy(info, aux, sizeof(struct info_binary));
+
+			vm_alloc_page_with_initializer(type_un, upage, writable, init, info);
 
 		}
 		break;
 		case VM_FILE:
 		{
-			printf("todo");
+			printf("vm_copy todo");
 		}
 
 		default:
@@ -371,20 +424,28 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 	}
 
 	return true;
-	// struct hash old = src->hash;
-	// dst->hash = old;
+}
 
+void spt_kill(struct hash_elem *e, void *aux)
+{
+	struct page *p = hash_entry(e, struct page, hash_elem);
+	struct thread *cur = thread_current();
+	
+	
+	vm_dealloc_page(p);
 }
 
 /* Free the resource hold by the supplemental page table */
+
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
-
-
 	hash_clear(&spt->hash, free_hash);
+	
 }
+
+
 
 
 

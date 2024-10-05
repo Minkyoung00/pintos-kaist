@@ -7,7 +7,7 @@
 static struct disk *swap_disk;
 static bool anon_swap_in (struct page *page, void *kva);
 static bool anon_swap_out (struct page *page);
-static void anon_destroy (struct page *page);
+void anon_destroy (struct page *page);
 
 /* DO NOT MODIFY this struct */
 static const struct page_operations anon_ops = {
@@ -28,6 +28,7 @@ vm_anon_init (void) {
 bool
 anon_initializer (struct page *page, enum vm_type type, void *kva) {
 	/* Set up the handler */
+
 	page->operations = &anon_ops;
 
 	struct anon_page *anon_page = &page->anon;
@@ -46,11 +47,11 @@ anon_swap_out (struct page *page) {
 }
 
 /* Destroy the anonymous page. PAGE will be freed by the caller. */
-static void
+void
 anon_destroy (struct page *page) {
+
 	struct anon_page *anon_page = &page->anon;
-
-	
-
-
+	hash_delete(&thread_current()->spt, &page->hash_elem);
+	palloc_free_page(page->frame->kva);
+	pml4_clear_page(thread_current()->pml4, page->va);
 }
